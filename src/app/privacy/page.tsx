@@ -53,6 +53,9 @@ export default function PrivacyPage() {
               (WebTorrent trackers, Nostr relays, or MQTT brokers) used to negotiate
               the connection. Only join rooms with people you trust, or use a VPN /
               relay-only TURN configuration if you wish to mask your IP address.
+              Optional voice and video chat streams are also transmitted directly
+              peer-to-peer only when you explicitly turn on your microphone or
+              camera, and are never recorded or sent to an application server.
             </p>
           </section>
 

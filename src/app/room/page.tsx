@@ -26,6 +26,7 @@ import {
 import { useAppContext } from '@/components/AppProvider';
 import { ChatBox } from '@/components/room/ChatBox';
 import { QrCodeCard } from '@/components/room/QrCodeCard';
+import { VoiceVideoPanel } from '@/components/room/VoiceVideoPanel';
 import { TicTacToeBoard } from '@/components/games/TicTacToeBoard';
 import { CheckersBoard } from '@/components/games/CheckersBoard';
 import { ChessBoard } from '@/components/games/ChessBoard';
@@ -89,6 +90,7 @@ function RoomWorkspace() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [turnTick, setTurnTick] = useState<{ version: number; left: number } | null>(null);
   const [triviaLoading, setTriviaLoading] = useState(false);
+  const [activeAdapter, setActiveAdapter] = useState<NetworkAdapter | null>(null);
 
   const adapterRef = useRef<NetworkAdapter | null>(null);
   const syncRef = useRef<RoomSyncController | null>(null);
@@ -105,6 +107,7 @@ function RoomWorkspace() {
   const teardown = useCallback(async () => {
     syncRef.current?.destroy();
     syncRef.current = null;
+    setActiveAdapter(null);
     if (adapterRef.current) {
       await adapterRef.current.disconnect();
       adapterRef.current = null;
@@ -125,6 +128,7 @@ function RoomWorkspace() {
         });
 
         adapterRef.current = adapter;
+        setActiveAdapter(adapter);
         setActiveStrategy(used);
         setConnStatus('connected');
         setShowPasswordPrompt(false);
@@ -958,8 +962,19 @@ function RoomWorkspace() {
           )}
         </div>
 
-        {/* Right Sidebar: Seats, Spectators & Chat */}
+        {/* Right Sidebar: Voice/Video, Seats, Spectators & Chat */}
         <div className="space-y-4">
+          <VoiceVideoPanel
+            key={activeAdapter?.selfPeerId ?? 'offline'}
+            adapter={activeAdapter}
+            connected={connStatus === 'connected'}
+            snapshot={snapshot}
+            selfPlayerId={profile.playerId}
+            selfDisplayName={profile.displayName}
+            selfAvatar={profile.avatar}
+            blockedPlayerIds={blockedIds}
+          />
+
           <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <h2 className="flex items-center justify-between text-xs font-bold tracking-wide text-slate-600 uppercase dark:text-slate-300">
               <span className="flex items-center gap-1.5">

@@ -12,6 +12,8 @@ import type {
   NetworkAdapter,
   NetworkEnvelope,
   NetworkError,
+  PeerStreamEvent,
+  PeerStreamMetadata,
   SignalingStrategy,
   Unsubscribe,
 } from './types';
@@ -74,6 +76,7 @@ function mapRoomError(err: RoomError): NetworkError {
  * Defaults to Torrent strategy with configurable fallback to Nostr or MQTT.
  */
 export class TrysteroAdapter implements NetworkAdapter {
+  readonly supportsMedia = true;
   private strategy: TrysteroStrategy;
   private _selfPeerId: string;
   private _status: ConnectionStatus = 'disconnected';
@@ -81,10 +84,12 @@ export class TrysteroAdapter implements NetworkAdapter {
   private action: MessageAction<JsonValue> | null = null;
   private unsubscribers: Unsubscribe[] = [];
   private peers = new Set<string>();
+  private activeLocalStreams = new Map<MediaStream, PeerStreamMetadata | undefined>();
 
   private messageHandlers = new Set<
     (msg: NetworkEnvelope, fromPeerId: string) => void
   >();
+  private streamHandlers = new Set<(event: PeerStreamEvent) => void>();
   private joinHandlers = new Set<(peerId: string) => void>();
   private leaveHandlers = new Set<(peerId: string) => void>();
   private errorHandlers = new Set<(err: NetworkError) => void>();
@@ -151,10 +156,32 @@ export class TrysteroAdapter implements NetworkAdapter {
         room.onPeerJoin(({ peerId }) => {
           this.peers.add(peerId);
           for (const h of this.joinHandlers) h(peerId);
+          // Share any already-active local audio/video stream with late-joining peers
+          for (const [stream, metadata] of this.activeLocalStreams) {
+            void room
+              .addStream(stream, {
+                target: peerId,
+                ...(metadata ? { metadata: metadata as unknown as JsonValue } : {}),
+              })
+              .catch(() => {});
+          }
         }),
         room.onPeerLeave(({ peerId }) => {
           this.peers.delete(peerId);
           for (const h of this.leaveHandlers) h(peerId);
+        }),
+        room.onPeerStream((stream, ctx) => {
+          const rawMeta = ctx.metadata;
+          const metadata =
+            rawMeta && typeof rawMeta === 'object' && !Array.isArray(rawMeta)
+              ? (rawMeta as unknown as PeerStreamMetadata)
+              : undefined;
+          const evt: PeerStreamEvent = {
+            stream,
+            peerId: ctx.peerId,
+            metadata,
+          };
+          for (const h of this.streamHandlers) h(evt);
         }),
         room.onError((roomErr) => {
           const mapped = mapRoomError(roomErr);
@@ -232,6 +259,7 @@ export class TrysteroAdapter implements NetworkAdapter {
     this.unsubscribers = [];
     this.action = null;
     this.peers.clear();
+    this.activeLocalStreams.clear();
 
     if (this.room) {
       const r = this.room;
@@ -277,6 +305,59 @@ export class TrysteroAdapter implements NetworkAdapter {
     if (!this.room) return [];
     const fromRoom = Object.keys(this.room.getPeers());
     return fromRoom.length > 0 ? fromRoom : Array.from(this.peers);
+  }
+
+  async addMediaStream(
+    stream: MediaStream,
+    options?: { targetPeerId?: string; metadata?: PeerStreamMetadata },
+  ): Promise<void> {
+    if (!this.room || this._status !== 'connected') {
+      throw new Error('TrysteroAdapter is not connected');
+    }
+    if (!options?.targetPeerId) {
+      this.activeLocalStreams.set(stream, options?.metadata);
+    }
+    await this.room.addStream(stream, {
+      ...(options?.targetPeerId ? { target: options.targetPeerId } : {}),
+      ...(options?.metadata
+        ? { metadata: options.metadata as unknown as JsonValue }
+        : {}),
+    });
+  }
+
+  removeMediaStream(stream: MediaStream, targetPeerId?: string): void {
+    if (!targetPeerId) {
+      this.activeLocalStreams.delete(stream);
+    }
+    if (!this.room) return;
+    try {
+      this.room.removeStream(
+        stream,
+        targetPeerId ? { target: targetPeerId } : undefined,
+      );
+    } catch {
+      // Ignore stream removal errors on disconnected peers
+    }
+  }
+
+  async replaceMediaTrack(
+    oldTrack: MediaStreamTrack,
+    newTrack: MediaStreamTrack,
+    targetPeerId?: string,
+  ): Promise<void> {
+    if (!this.room || this._status !== 'connected') {
+      throw new Error('TrysteroAdapter is not connected');
+    }
+    await this.room.replaceTrack(
+      oldTrack,
+      newTrack,
+      targetPeerId ? { target: targetPeerId } : undefined,
+    );
+  }
+
+  onPeerStream(handler: (event: PeerStreamEvent) => void): Unsubscribe {
+    this.streamHandlers.add(handler);
+    return () => this.streamHandlers.delete(handler);
   }
 
   onMessage(

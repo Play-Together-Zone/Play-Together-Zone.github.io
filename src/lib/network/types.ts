@@ -35,10 +35,23 @@ export interface ConnectOptions {
 
 export type Unsubscribe = () => void;
 
+export interface PeerStreamMetadata {
+  playerId?: string;
+  audio?: boolean;
+  video?: boolean;
+}
+
+export interface PeerStreamEvent {
+  stream: MediaStream;
+  peerId: string;
+  metadata?: PeerStreamMetadata;
+}
+
 export interface NetworkAdapter {
   readonly transportName: string;
   readonly selfPeerId: string;
   readonly status: ConnectionStatus;
+  readonly supportsMedia?: boolean;
 
   connect(roomCode: string, options?: ConnectOptions): Promise<void>;
   disconnect(): Promise<void>;
@@ -51,6 +64,18 @@ export interface NetworkAdapter {
 
   ping(peerId: string): Promise<number>;
   getConnectedPeers(): string[];
+
+  addMediaStream?(
+    stream: MediaStream,
+    options?: { targetPeerId?: string; metadata?: PeerStreamMetadata },
+  ): Promise<void>;
+  removeMediaStream?(stream: MediaStream, targetPeerId?: string): void;
+  replaceMediaTrack?(
+    oldTrack: MediaStreamTrack,
+    newTrack: MediaStreamTrack,
+    targetPeerId?: string,
+  ): Promise<void>;
+  onPeerStream?(handler: (event: PeerStreamEvent) => void): Unsubscribe;
 
   onMessage(
     handler: (msg: NetworkEnvelope, fromPeerId: string) => void,
