@@ -11,7 +11,6 @@ import {
   Grid3X3,
   HelpCircle,
   Layers,
-  ShieldCheck,
   Sparkles,
   Users,
 } from 'lucide-react';
@@ -75,17 +74,13 @@ export default function HomePage() {
       <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-[#061235] via-[#0c1d52] to-slate-900 p-6 text-white shadow-xl sm:p-8 dark:border-slate-800">
         <div className="grid gap-8 lg:grid-cols-5 lg:items-center">
           <div className="space-y-4 lg:col-span-3">
-            <div className="flex flex-wrap items-center gap-4">
+            <div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={withBasePath('/logo.jpg')}
                 alt="Play-Together-Zone — Play, Connect, Enjoy"
                 className="h-24 w-auto rounded-2xl border border-white/15 bg-[#061235] object-contain shadow-lg sm:h-28"
               />
-              <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/30 bg-indigo-500/15 px-3 py-1 text-xs font-semibold text-indigo-200">
-                <ShieldCheck className="h-3.5 w-3.5" />
-                100% Static · Serverless WebRTC P2P
-              </div>
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
               Play-<span className="text-amber-400">Together</span>-Zone: Play · Connect · Enjoy
