@@ -15,6 +15,7 @@ import {
   KeyRound,
   LogOut,
   Play,
+  QrCode,
   RefreshCw,
   Settings,
   ShieldAlert,
@@ -22,6 +23,7 @@ import {
   Users,
   Wifi,
   WifiOff,
+  X,
 } from 'lucide-react';
 import { useAppContext } from '@/components/AppProvider';
 import { ChatBox } from '@/components/room/ChatBox';
@@ -88,6 +90,7 @@ function RoomWorkspace() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
   const [turnTick, setTurnTick] = useState<{ version: number; left: number } | null>(null);
   const [triviaLoading, setTriviaLoading] = useState(false);
   const [activeAdapter, setActiveAdapter] = useState<NetworkAdapter | null>(null);
@@ -96,6 +99,8 @@ function RoomWorkspace() {
   const syncRef = useRef<RoomSyncController | null>(null);
   const lastRecordedVersionRef = useRef<number>(-1);
   const prevVersionRef = useRef<number>(0);
+  const qrOpenRef = useRef(false);
+  const qrBaselineCountRef = useRef(0);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -155,6 +160,21 @@ function RoomWorkspace() {
                   playSound('move', soundEnabled);
                 }
                 prevVersionRef.current = snap.version;
+              }
+              const otherConnected =
+                snap.seats.filter(
+                  (s) =>
+                    s.connected && !s.isBot && s.playerId !== profile.playerId,
+                ).length +
+                snap.spectators.filter((sp) => sp.playerId !== profile.playerId)
+                  .length;
+              if (
+                qrOpenRef.current &&
+                otherConnected > qrBaselineCountRef.current
+              ) {
+                qrOpenRef.current = false;
+                setShowQrModal(false);
+                showToast('Player connected — QR code closed.');
               }
             },
             onChat: (msg) => {
@@ -299,6 +319,39 @@ function RoomWorkspace() {
       }),
     [roomCode, snapshot?.gameId, initialGameParam, strategy],
   );
+
+  const otherConnectedCount = useMemo(() => {
+    if (!snapshot) return 0;
+    const connectedSeats = snapshot.seats.filter(
+      (s) => s.connected && !s.isBot && s.playerId !== profile.playerId,
+    ).length;
+    const connectedSpectators = snapshot.spectators.filter(
+      (sp) => sp.playerId !== profile.playerId,
+    ).length;
+    return connectedSeats + connectedSpectators;
+  }, [snapshot, profile.playerId]);
+
+  const openQrModal = useCallback(() => {
+    qrBaselineCountRef.current = otherConnectedCount;
+    qrOpenRef.current = true;
+    setShowQrModal(true);
+  }, [otherConnectedCount]);
+
+  const closeQrModal = useCallback(() => {
+    qrOpenRef.current = false;
+    setShowQrModal(false);
+  }, []);
+
+  useEffect(() => {
+    if (!showQrModal) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeQrModal();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showQrModal, closeQrModal]);
 
   const handleCopyLink = async () => {
     try {
@@ -506,6 +559,16 @@ function RoomWorkspace() {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
+            onClick={openQrModal}
+            className="flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-500/20 dark:border-emerald-500/40 dark:text-emerald-300"
+            title="Show QR code to invite a player"
+          >
+            <QrCode className="h-3.5 w-3.5" />
+            Join by QR Code
+          </button>
+
+          <button
+            type="button"
             onClick={() => void handleCopyLink()}
             className="flex items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
           >
@@ -672,17 +735,14 @@ function RoomWorkspace() {
             </div>
           ) : snapshot.phase === 'lobby' ? (
             <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                    Match Lobby
-                  </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Share the code or QR link. Host can adjust rules, add bots, or
-                    start the match.
-                  </p>
-                </div>
-                <QrCodeCard url={shareUrl} />
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                  Match Lobby
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Share the code or QR link. Host can adjust rules, add bots, or
+                  start the match.
+                </p>
               </div>
 
               {isHost && (
@@ -1074,6 +1134,61 @@ function RoomWorkspace() {
           />
         </div>
       </div>
+
+      {showQrModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="qr-modal-title"
+          onClick={closeQrModal}
+        >
+          <div
+            className="animate-pop w-full max-w-xs rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h2
+                id="qr-modal-title"
+                className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white"
+              >
+                <QrCode className="h-4 w-4 text-emerald-500" />
+                Join by QR Code
+              </h2>
+              <button
+                type="button"
+                onClick={closeQrModal}
+                className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                aria-label="Close QR code dialog"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex justify-center">
+              <QrCodeCard url={shareUrl} />
+            </div>
+
+            <p className="mt-3 text-xs text-slate-600 dark:text-slate-300">
+              Room Code:{' '}
+              <span className="font-mono font-bold tracking-wider text-indigo-600 dark:text-indigo-400">
+                {roomCode}
+              </span>
+            </p>
+            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+              Auto-closes as soon as a player connects.
+            </p>
+
+            <button
+              type="button"
+              onClick={closeQrModal}
+              className="mt-4 w-full rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
