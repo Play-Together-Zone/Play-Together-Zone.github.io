@@ -49,14 +49,14 @@ export function Navbar() {
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/85 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/85">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-          <div className="flex items-center gap-5">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
+          <div className="flex min-w-0 items-center gap-4 lg:gap-5">
             <Link
               href="/"
-              className="flex items-center gap-2.5 text-lg font-extrabold tracking-tight text-slate-900 dark:text-white"
+              className="flex min-w-0 items-center gap-2 text-sm font-extrabold tracking-tight text-slate-900 sm:gap-2.5 sm:text-lg dark:text-white"
             >
-              <BrandMark className="h-9 w-9 shrink-0 rounded-xl shadow-sm" />
-              <span>
+              <BrandMark className="h-8 w-8 shrink-0 rounded-xl shadow-sm sm:h-9 sm:w-9" />
+              <span className="truncate whitespace-nowrap">
                 Play-<span className="text-amber-500">Together</span>-Zone
               </span>
             </Link>
@@ -97,11 +97,11 @@ export function Navbar() {
             </nav>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <button
               type="button"
               onClick={() => setStatsOpen(true)}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="flex items-center gap-1.5 rounded-lg border border-slate-200 p-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 sm:px-2.5 sm:py-1.5 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               aria-label="View local stats"
               title="Local Stats"
             >
@@ -112,7 +112,7 @@ export function Navbar() {
             <button
               type="button"
               onClick={toggleSound}
-              className="rounded-lg border border-slate-200 p-2 text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="rounded-lg border border-slate-200 p-1.5 text-slate-700 transition hover:bg-slate-100 sm:p-2 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               aria-label={soundEnabled ? 'Mute sound effects' : 'Enable sound effects'}
               title={soundEnabled ? 'Sound On' : 'Sound Off'}
             >
@@ -126,7 +126,7 @@ export function Navbar() {
             <button
               type="button"
               onClick={toggleTheme}
-              className="rounded-lg border border-slate-200 p-2 text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="rounded-lg border border-slate-200 p-1.5 text-slate-700 transition hover:bg-slate-100 sm:p-2 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
               title={theme === 'dark' ? 'Light theme' : 'Dark theme'}
             >
@@ -140,13 +140,16 @@ export function Navbar() {
             <button
               type="button"
               onClick={openProfile}
-              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-800 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1 text-sm font-medium text-slate-800 transition hover:bg-slate-100 sm:gap-2 sm:px-3 sm:py-1.5 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
               aria-label="Edit player profile"
+              title={profile.displayName}
             >
-              <span className="text-base" aria-hidden="true">
+              <span className="text-base leading-none" aria-hidden="true">
                 {profile.avatar}
               </span>
-              <span className="max-w-[110px] truncate">{profile.displayName}</span>
+              <span className="hidden max-w-[110px] truncate sm:inline">
+                {profile.displayName}
+              </span>
               <User className="h-3.5 w-3.5 text-slate-400" />
             </button>
           </div>
@@ -154,22 +157,22 @@ export function Navbar() {
 
         <nav
           aria-label="Mobile navigation"
-          className="flex items-center justify-around border-t border-slate-200/70 px-2 py-1.5 text-xs font-medium text-slate-600 md:hidden dark:border-slate-800/70 dark:text-slate-300"
+          className="grid grid-cols-4 border-t border-slate-200/70 px-2 py-1.5 text-center text-[11px] font-medium text-slate-600 md:hidden dark:border-slate-800/70 dark:text-slate-300"
         >
-          <Link href="/" className="rounded-lg px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <Link href="/" className="rounded-lg px-1.5 py-1 hover:bg-slate-100 dark:hover:bg-slate-800">
             Games
           </Link>
-          <Link href="/ping/" className="rounded-lg px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <Link href="/ping/" className="rounded-lg px-1.5 py-1 hover:bg-slate-100 dark:hover:bg-slate-800">
             Ping Test
           </Link>
-          <Link href="/privacy/" className="rounded-lg px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <Link href="/privacy/" className="rounded-lg px-1.5 py-1 hover:bg-slate-100 dark:hover:bg-slate-800">
             Privacy
           </Link>
           <a
             href="https://khushwinder-dev.github.io/"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="inline-flex items-center justify-center gap-1 rounded-lg px-1.5 py-1 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             Contact
             <ExternalLink className="h-3 w-3 opacity-70" />
