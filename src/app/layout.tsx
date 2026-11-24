@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import './globals.css';
 import { AppProvider } from '@/components/AppProvider';
 import { Navbar } from '@/components/Navbar';
@@ -18,6 +19,17 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className="min-h-screen bg-slate-50 text-slate-900 antialiased transition-colors dark:bg-slate-950 dark:text-slate-100">
+        <Script
+          src="https://www.googletagmanager.com/gtm.js?id=GTM-TR8G4MN9"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics-gtag" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+          `}
+        </Script>
         <AppProvider>
           <div className="flex min-h-screen flex-col">
             <Navbar />
