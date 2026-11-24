@@ -79,7 +79,7 @@ export default function HomePage() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={withBasePath('/logo.jpg')}
-                alt="PlayTogether — Play, Connect, Enjoy"
+                alt="Play-Together-Zone — Play, Connect, Enjoy"
                 className="h-24 w-auto rounded-2xl border border-white/15 bg-[#061235] object-contain shadow-lg sm:h-28"
               />
               <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/30 bg-indigo-500/15 px-3 py-1 text-xs font-semibold text-indigo-200">
@@ -88,7 +88,7 @@ export default function HomePage() {
               </div>
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
-              Play<span className="text-amber-400">Together</span>: Play · Connect · Enjoy
+              Play-<span className="text-amber-400">Together</span>-Zone: Play · Connect · Enjoy
             </h1>
             <p className="max-w-2xl text-sm leading-relaxed text-slate-300">
               Create a room code, share a link or QR code, and play directly with

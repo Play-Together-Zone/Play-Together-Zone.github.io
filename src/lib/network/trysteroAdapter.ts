@@ -21,7 +21,7 @@ export type TrysteroStrategy = Extract<
   'torrent' | 'nostr' | 'mqtt'
 >;
 
-export const DEFAULT_TRYSTERO_APP_ID = 'playtogether-p2p-v1';
+export const DEFAULT_TRYSTERO_APP_ID = 'play-together-zone-p2p-v1';
 
 async function loadStrategyJoinRoom(strategy: TrysteroStrategy) {
   switch (strategy) {

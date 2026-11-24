@@ -10,7 +10,7 @@ export default function PrivacyPage() {
           Privacy &amp; Open-Source Credits
         </h1>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-          PlayTogether is a static, serverless web application hosted with zero
+          Play-Together-Zone is a static, serverless web application hosted with zero
           backend database or tracking infrastructure. Need to reach the creator?
           Visit{' '}
           <a

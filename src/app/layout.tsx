@@ -5,9 +5,9 @@ import { Navbar } from '@/components/Navbar';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'PlayTogether — Play · Connect · Enjoy',
+  title: 'Play-Together-Zone — Play · Connect · Enjoy',
   description:
-    'PlayTogether: turn-based peer-to-peer multiplayer games running directly over WebRTC with zero backend servers.',
+    'Play-Together-Zone: turn-based peer-to-peer multiplayer games running directly over WebRTC with zero backend servers.',
 };
 
 export default function RootLayout({
@@ -27,7 +27,7 @@ export default function RootLayout({
             <footer className="border-t border-slate-200/80 py-5 text-center text-xs text-slate-500 dark:border-slate-800/80 dark:text-slate-400">
               <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-4 sm:flex-row">
                 <p>
-                  &copy; 2026 PlayTogether &mdash; Play &middot; Connect &middot;
+                  &copy; 2026 Play-Together-Zone &mdash; Play &middot; Connect &middot;
                   Enjoy. All rights reserved.
                 </p>
                 <div className="flex items-center gap-4">

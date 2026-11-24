@@ -57,7 +57,7 @@ export function Navbar() {
             >
               <BrandMark className="h-9 w-9 shrink-0 rounded-xl shadow-sm" />
               <span>
-                Play<span className="text-amber-500">Together</span>
+                Play-<span className="text-amber-500">Together</span>-Zone
               </span>
             </Link>
 
