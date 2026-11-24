@@ -128,7 +128,7 @@ function HomePage() {
                                     children: [
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
                                             src: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$url$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withBasePath"])('/logo.jpg'),
-                                            alt: "PlayTogether — Play, Connect, Enjoy",
+                                            alt: "Play-Together-Zone — Play, Connect, Enjoy",
                                             className: "h-24 w-auto rounded-2xl border border-white/15 bg-[#061235] object-contain shadow-lg sm:h-28"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/page.tsx",
@@ -161,16 +161,16 @@ function HomePage() {
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
                                     className: "text-3xl font-extrabold tracking-tight sm:text-4xl",
                                     children: [
-                                        "Play",
+                                        "Play-",
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                             className: "text-amber-400",
                                             children: "Together"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/page.tsx",
                                             lineNumber: 91,
-                                            columnNumber: 19
+                                            columnNumber: 20
                                         }, this),
-                                        ": Play · Connect · Enjoy"
+                                        "-Zone: Play · Connect · Enjoy"
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/app/page.tsx",

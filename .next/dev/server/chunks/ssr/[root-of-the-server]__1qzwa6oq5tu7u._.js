@@ -7040,7 +7040,7 @@ __turbopack_context__.s([
 ]);
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$network$2f$ice$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/lib/network/ice.ts [app-ssr] (ecmascript)");
 ;
-const DEFAULT_TRYSTERO_APP_ID = 'playtogether-p2p-v1';
+const DEFAULT_TRYSTERO_APP_ID = 'play-together-zone-p2p-v1';
 async function loadStrategyJoinRoom(strategy) {
     switch(strategy){
         case 'torrent':

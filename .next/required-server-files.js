@@ -106,7 +106,7 @@ self.__SERVER_FILES_MANIFEST={
         "transform": "lodash/{{member}}"
       }
     },
-    "outputFileTracingRoot": "D:\\Projects\\MultiplePlayersGame",
+    "outputFileTracingRoot": "D:\\Projects\\Play-Together-Zone.github.io",
     "enablePrerenderSourceMaps": true,
     "cacheComponents": false,
     "cacheLife": {
@@ -335,13 +335,13 @@ self.__SERVER_FILES_MANIFEST={
     "htmlLimitedBots": "[\\w-]+-Google|Google-[\\w-]+|Chrome-Lighthouse|Slurp|DuckDuckBot|baiduspider|yandex|sogou|bitlybot|tumblr|vkShare|quora link preview|redditbot|ia_archiver|Bingbot|BingPreview|applebot|facebookexternalhit|facebookcatalog|Twitterbot|LinkedInBot|Slackbot|Discordbot|WhatsApp|SkypeUriPreview|Yeti|googleweblight",
     "bundlePagesRouterDependencies": false,
     "configFileName": "next.config.ts",
-    "repoRoot": "D:\\Projects\\MultiplePlayersGame",
+    "repoRoot": "D:\\Projects\\Play-Together-Zone.github.io",
     "turbopack": {
-      "root": "D:\\Projects\\MultiplePlayersGame"
+      "root": "D:\\Projects\\Play-Together-Zone.github.io"
     },
     "distDirRoot": ".next"
   },
-  "appDir": "D:\\Projects\\MultiplePlayersGame",
+  "appDir": "D:\\Projects\\Play-Together-Zone.github.io",
   "relativeAppDir": "",
   "files": [
     ".next\\package.json",
