@@ -1,5 +1,15 @@
 import React from 'react';
+import type { Metadata } from 'next';
 import { ShieldCheck } from 'lucide-react';
+
+export const metadata: Metadata = {
+  title: 'Privacy & Open-Source Credits',
+  description:
+    'Learn how Play-Together-Zone protects your privacy with browser-only local storage, peer-to-peer multiplayer, and optional voice/video chat.',
+  alternates: {
+    canonical: '/privacy/',
+  },
+};
 
 export default function PrivacyPage() {
   return (

@@ -86,9 +86,10 @@ export default function HomePage() {
               Play-<span className="text-amber-400">Together</span>-Zone: Play · Connect · Enjoy
             </h1>
             <p className="max-w-2xl text-sm leading-relaxed text-slate-300">
-              Create a room code, share a link or QR code, and play directly with
-              friends or practice against built-in bots — no accounts or sign-ups
-              required.
+              Create a room code, share an invite link or QR code, and play
+              Chess, Ludo, Checkers, Tic-Tac-Toe, Color Rush, or Trivia Blitz
+              live with friends — complete with built-in voice &amp; video chat
+              and solo bot mode, with zero sign-ups required.
             </p>
           </div>
 
@@ -227,6 +228,54 @@ export default function HomePage() {
               </div>
             </article>
           ))}
+        </div>
+      </section>
+
+      <section
+        aria-labelledby="faq-heading"
+        className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900"
+      >
+        <h2
+          id="faq-heading"
+          className="text-lg font-bold text-slate-900 dark:text-white"
+        >
+          Play Multiplayer Board &amp; Party Games Online
+        </h2>
+        <p className="mt-1.5 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          Play-Together-Zone lets you host instant browser rooms for 2 to 8
+          players across classic strategy games (Chess, Checkers, Tic-Tac-Toe),
+          tabletop favorites (Ludo), fast card action (Color Rush), and live
+          multiplayer quizzes (Trivia Blitz).
+        </p>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              No Sign-Up Required
+            </h3>
+            <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
+              Jump straight into a match in seconds. Pick a display name, create
+              a room, and share the 5-character code or QR code.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              Live Voice &amp; Video Chat
+            </h3>
+            <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
+              Talk or video-call with friends right in the room sidebar without
+              interrupting the board, timers, or turns.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              Solo Bot &amp; Spectators
+            </h3>
+            <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
+              Practice solo against AI opponents anytime, or invite extra
+              friends to watch matches as live spectators.
+            </p>
+          </div>
         </div>
       </section>
     </div>
