@@ -6,8 +6,10 @@ import {
   ChevronUp,
   GripHorizontal,
   Headphones,
+  Maximize2,
   Mic,
   MicOff,
+  Minimize2,
   PhoneOff,
   Video,
   VideoOff,
@@ -98,6 +100,23 @@ function clampPositionToViewport(
   };
 }
 
+function clampPanelSize(
+  width: number,
+  height: number,
+): { width: number; height: number } {
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+  const maxW =
+    typeof window !== 'undefined' ? Math.min(720, window.innerWidth - 16) : 720;
+  const maxH =
+    typeof window !== 'undefined'
+      ? Math.floor(window.innerHeight * (isMobile ? 0.72 : 0.8))
+      : 600;
+  return {
+    width: Math.round(Math.min(Math.max(260, width), Math.max(260, maxW))),
+    height: Math.round(Math.min(Math.max(150, height), Math.max(180, maxH))),
+  };
+}
+
 export function VoiceVideoPanel({
   adapter,
   connected,
@@ -118,6 +137,11 @@ export function VoiceVideoPanel({
   const [busy, setBusy] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
+  const [panelSize, setPanelSize] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [, setTrackTick] = useState(0);
 
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -129,6 +153,14 @@ export function VoiceVideoPanel({
     offsetX: number;
     offsetY: number;
   } | null>(null);
+  const resizeStateRef = useRef<{
+    pointerId: number;
+    edge: 'nw' | 'w' | 'n' | 'se';
+    startX: number;
+    startY: number;
+    startRect: DOMRect;
+    hadDragPos: boolean;
+  } | null>(null);
 
   useEffect(() => {
     audioEnabledRef.current = audioEnabled;
@@ -138,35 +170,47 @@ export function VoiceVideoPanel({
     videoEnabledRef.current = videoEnabled;
   }, [videoEnabled]);
 
-  // Keep dragged floating position strictly inside viewport on resize or panel size changes
+  // Keep dragged floating position and resized bounds strictly inside viewport
   useEffect(() => {
     const el = panelRef.current;
     if (!el || typeof window === 'undefined') return;
 
     const reclamp = () => {
-      if (window.innerWidth < 640) {
+      const mobile = window.innerWidth < 640;
+      setIsMobileViewport(mobile);
+      if (mobile) {
         setDragPos((prev) => (prev !== null ? null : prev));
-        return;
       }
-      const rect = el.getBoundingClientRect();
-      setDragPos((prev) => {
+      setPanelSize((prev) => {
         if (!prev) return prev;
-        const clamped = clampPositionToViewport(
-          prev.x,
-          prev.y,
-          rect.width,
-          rect.height,
-        );
-        return clamped.x === prev.x && clamped.y === prev.y ? prev : clamped;
+        const clamped = clampPanelSize(prev.width, prev.height);
+        return clamped.width === prev.width && clamped.height === prev.height
+          ? prev
+          : clamped;
       });
+      if (!mobile) {
+        const rect = el.getBoundingClientRect();
+        setDragPos((prev) => {
+          if (!prev) return prev;
+          const clamped = clampPositionToViewport(
+            prev.x,
+            prev.y,
+            rect.width,
+            rect.height,
+          );
+          return clamped.x === prev.x && clamped.y === prev.y ? prev : clamped;
+        });
+      }
     };
 
+    const rafId = requestAnimationFrame(reclamp);
     window.addEventListener('resize', reclamp);
     const ro =
       typeof ResizeObserver !== 'undefined' ? new ResizeObserver(reclamp) : null;
     ro?.observe(el);
 
     return () => {
+      cancelAnimationFrame(rafId);
       window.removeEventListener('resize', reclamp);
       ro?.disconnect();
     };
@@ -500,6 +544,93 @@ export function VoiceVideoPanel({
     }
   };
 
+  const handleResizePointerDown = (
+    e: React.PointerEvent<HTMLDivElement>,
+    edge: 'nw' | 'w' | 'n' | 'se',
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const el = panelRef.current;
+    if (!el) return;
+    resizeStateRef.current = {
+      pointerId: e.pointerId,
+      edge,
+      startX: e.clientX,
+      startY: e.clientY,
+      startRect: el.getBoundingClientRect(),
+      hadDragPos: dragPos !== null,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handleResizePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const rs = resizeStateRef.current;
+    if (!rs || rs.pointerId !== e.pointerId || typeof window === 'undefined') {
+      return;
+    }
+
+    const dx = e.clientX - rs.startX;
+    const dy = e.clientY - rs.startY;
+    const { startRect, edge, hadDragPos } = rs;
+
+    let rawWidth = startRect.width;
+    let rawHeight = startRect.height;
+
+    if (edge === 'nw' || edge === 'w') {
+      rawWidth = startRect.width - dx;
+    } else if (edge === 'se') {
+      rawWidth = startRect.width + dx;
+    }
+
+    if (edge === 'nw' || edge === 'n') {
+      rawHeight = startRect.height - dy;
+    } else if (edge === 'se') {
+      rawHeight = startRect.height + dy;
+    }
+
+    const clamped = clampPanelSize(rawWidth, rawHeight);
+    setPanelSize(clamped);
+
+    if (hadDragPos && window.innerWidth >= 640) {
+      let nextX = startRect.left;
+      let nextY = startRect.top;
+      if (edge === 'nw' || edge === 'w') {
+        nextX = startRect.right - clamped.width;
+      }
+      if (edge === 'nw' || edge === 'n') {
+        nextY = startRect.bottom - clamped.height;
+      }
+      setDragPos(
+        clampPositionToViewport(nextX, nextY, clamped.width, clamped.height),
+      );
+    }
+  };
+
+  const handleResizePointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (resizeStateRef.current?.pointerId === e.pointerId) {
+      resizeStateRef.current = null;
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    }
+  };
+
+  const handleToggleSizePreset = () => {
+    if (typeof window === 'undefined') return;
+    if (panelSize) {
+      setPanelSize(null);
+      return;
+    }
+    const mobile = window.innerWidth < 640;
+    const expanded = clampPanelSize(
+      mobile ? window.innerWidth - 16 : Math.min(540, window.innerWidth - 32),
+      mobile
+        ? Math.floor(window.innerHeight * 0.52)
+        : Math.floor(window.innerHeight * 0.56),
+    );
+    setPanelSize(expanded);
+  };
+
   const visibleRemotePeers = useMemo(() => {
     return Object.values(remoteStreams)
       .map((entry) => {
@@ -538,25 +669,104 @@ export function VoiceVideoPanel({
   const callActive = audioEnabled || videoEnabled || localStream !== null;
   const hasStreams = Boolean(localStream) || visibleRemotePeers.length > 0;
   const totalTileCount = (localStream ? 1 : 0) + visibleRemotePeers.length;
+  const activeExpanded = !minimized && hasStreams;
+
+  const panelStyle: React.CSSProperties = {
+    ...(dragPos && !isMobileViewport
+      ? {
+          left: `${dragPos.x}px`,
+          top: `${dragPos.y}px`,
+          right: 'auto',
+          bottom: 'auto',
+        }
+      : undefined),
+    ...(activeExpanded && panelSize
+      ? {
+          ...(isMobileViewport ? {} : { width: `${panelSize.width}px` }),
+          height: `${panelSize.height}px`,
+          maxHeight: isMobileViewport ? '72dvh' : '82dvh',
+        }
+      : undefined),
+  };
 
   return (
     <section
       ref={panelRef}
       aria-label="Floating voice and video chat"
-      style={
-        dragPos
-          ? {
-              left: `${dragPos.x}px`,
-              top: `${dragPos.y}px`,
-              right: 'auto',
-              bottom: 'auto',
-            }
-          : undefined
-      }
-      className={`fixed inset-x-2 bottom-2 z-40 mx-auto flex max-h-[48dvh] w-auto max-w-lg flex-col rounded-2xl border border-slate-200/90 bg-white/95 shadow-2xl backdrop-blur-md transition-shadow sm:inset-x-auto sm:right-4 sm:bottom-4 sm:mx-0 sm:max-h-[calc(100dvh-5.5rem)] dark:border-slate-700/90 dark:bg-slate-900/95 ${
-        hasStreams && !minimized ? 'sm:w-[348px]' : 'sm:w-auto'
+      style={panelStyle}
+      className={`fixed inset-x-2 bottom-2 z-40 mx-auto flex max-h-[48dvh] w-auto max-w-lg flex-col rounded-2xl border border-slate-200/90 bg-white/95 shadow-2xl backdrop-blur-md transition-shadow sm:inset-x-auto sm:right-4 sm:bottom-4 sm:mx-0 sm:max-h-[calc(100dvh-5.5rem)] sm:max-w-[calc(100vw-1rem)] dark:border-slate-700/90 dark:bg-slate-900/95 ${
+        activeExpanded
+          ? panelSize
+            ? ''
+            : 'sm:w-[348px]'
+          : 'sm:w-auto'
       }`}
     >
+      {/* Mobile Top Height Resize Handle */}
+      {activeExpanded && (
+        <div
+          onPointerDown={(e) => handleResizePointerDown(e, 'n')}
+          onPointerMove={handleResizePointerMove}
+          onPointerUp={handleResizePointerEnd}
+          onPointerCancel={handleResizePointerEnd}
+          onDoubleClick={() => setPanelSize(null)}
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Drag to resize voice and video height"
+          title="Drag up or down to resize"
+          className="flex cursor-ns-resize touch-none items-center justify-center pt-1.5 pb-0.5 sm:hidden"
+        >
+          <span className="h-1 w-10 rounded-full bg-slate-300 dark:bg-slate-600" />
+        </div>
+      )}
+
+      {/* Desktop Edge & Corner Resize Handles */}
+      {activeExpanded && (
+        <>
+          <div
+            onPointerDown={(e) => handleResizePointerDown(e, 'nw')}
+            onPointerMove={handleResizePointerMove}
+            onPointerUp={handleResizePointerEnd}
+            onPointerCancel={handleResizePointerEnd}
+            onDoubleClick={() => setPanelSize(null)}
+            title="Drag corner to resize · Double-click to reset"
+            aria-label="Drag top-left corner to resize"
+            className="hidden sm:flex sm:absolute sm:top-0.5 sm:left-0.5 sm:z-20 sm:h-4 sm:w-4 sm:cursor-nwse-resize sm:touch-none sm:items-start sm:justify-start sm:rounded-tl-2xl sm:p-1"
+          >
+            <span className="h-2 w-2 rounded-tl-xs border-t-2 border-l-2 border-slate-400/70 dark:border-slate-500/80" />
+          </div>
+          <div
+            onPointerDown={(e) => handleResizePointerDown(e, 'w')}
+            onPointerMove={handleResizePointerMove}
+            onPointerUp={handleResizePointerEnd}
+            onPointerCancel={handleResizePointerEnd}
+            onDoubleClick={() => setPanelSize(null)}
+            title="Drag left edge to resize width"
+            className="hidden sm:block sm:absolute sm:top-4 sm:bottom-4 sm:left-0 sm:z-10 sm:w-1.5 sm:cursor-ew-resize sm:touch-none"
+          />
+          <div
+            onPointerDown={(e) => handleResizePointerDown(e, 'n')}
+            onPointerMove={handleResizePointerMove}
+            onPointerUp={handleResizePointerEnd}
+            onPointerCancel={handleResizePointerEnd}
+            onDoubleClick={() => setPanelSize(null)}
+            title="Drag top edge to resize height"
+            className="hidden sm:block sm:absolute sm:top-0 sm:right-4 sm:left-4 sm:z-10 sm:h-1.5 sm:cursor-ns-resize sm:touch-none"
+          />
+          {dragPos && (
+            <div
+              onPointerDown={(e) => handleResizePointerDown(e, 'se')}
+              onPointerMove={handleResizePointerMove}
+              onPointerUp={handleResizePointerEnd}
+              onPointerCancel={handleResizePointerEnd}
+              onDoubleClick={() => setPanelSize(null)}
+              title="Drag bottom-right corner to resize"
+              aria-label="Drag bottom-right corner to resize"
+              className="hidden sm:block sm:absolute sm:right-0 sm:bottom-0 sm:z-20 sm:h-3.5 sm:w-3.5 sm:cursor-nwse-resize sm:touch-none sm:rounded-br-2xl"
+            />
+          )}
+        </>
+      )}
       {/* Keep remote audio playing seamlessly even when minimized */}
       {minimized && visibleRemotePeers.length > 0 && (
         <div className="sr-only" aria-hidden="true">
@@ -653,6 +863,22 @@ export function VoiceVideoPanel({
             </button>
           )}
 
+          {hasStreams && !minimized && (
+            <button
+              type="button"
+              onClick={handleToggleSizePreset}
+              className="rounded-xl border border-slate-300 p-1.5 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              title={panelSize ? 'Reset dock size' : 'Expand dock size'}
+              aria-label={panelSize ? 'Reset voice and video dock size' : 'Expand voice and video dock size'}
+            >
+              {panelSize ? (
+                <Minimize2 className="h-3.5 w-3.5" />
+              ) : (
+                <Maximize2 className="h-3.5 w-3.5" />
+              )}
+            </button>
+          )}
+
           {hasStreams && (
             <button
               type="button"
@@ -695,9 +921,13 @@ export function VoiceVideoPanel({
       {!minimized && hasStreams && (
         <div className="min-h-0 flex-1 overflow-y-auto border-t border-slate-200/80 p-2.5 dark:border-slate-800">
           <div
-            className={`grid gap-2 ${
-              totalTileCount === 1 ? 'grid-cols-1' : 'grid-cols-2'
-            }`}
+            className="grid gap-2"
+            style={{
+              gridTemplateColumns:
+                totalTileCount === 1
+                  ? '1fr'
+                  : 'repeat(auto-fit, minmax(140px, 1fr))',
+            }}
           >
             {localStream && (
               <div className="relative overflow-hidden rounded-xl border border-indigo-500/40 bg-slate-950">
