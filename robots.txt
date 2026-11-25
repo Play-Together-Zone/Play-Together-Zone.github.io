@@ -1,0 +1,7 @@
+User-Agent: *
+Allow: /
+Disallow: /room/
+Disallow: /contact/
+
+Host: https://play-together-zone.github.io
+Sitemap: https://play-together-zone.github.io/sitemap.xml
