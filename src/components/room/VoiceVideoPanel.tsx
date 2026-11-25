@@ -100,20 +100,24 @@ function clampPositionToViewport(
   };
 }
 
+type ResizeEdge = 'n' | 's' | 'e' | 'w' | 'nw' | 'ne' | 'sw' | 'se';
+
+const MIN_PANEL_WIDTH = 180;
+const MIN_PANEL_HEIGHT = 120;
+
 function clampPanelSize(
   width: number,
   height: number,
 ): { width: number; height: number } {
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
   const maxW =
-    typeof window !== 'undefined' ? Math.min(720, window.innerWidth - 16) : 720;
+    typeof window !== 'undefined' ? Math.max(MIN_PANEL_WIDTH, window.innerWidth - 16) : 960;
   const maxH =
     typeof window !== 'undefined'
-      ? Math.floor(window.innerHeight * (isMobile ? 0.72 : 0.8))
-      : 600;
+      ? Math.max(MIN_PANEL_HEIGHT, window.innerHeight - 16)
+      : 720;
   return {
-    width: Math.round(Math.min(Math.max(260, width), Math.max(260, maxW))),
-    height: Math.round(Math.min(Math.max(150, height), Math.max(180, maxH))),
+    width: Math.round(Math.min(Math.max(MIN_PANEL_WIDTH, width), maxW)),
+    height: Math.round(Math.min(Math.max(MIN_PANEL_HEIGHT, height), maxH)),
   };
 }
 
@@ -155,11 +159,10 @@ export function VoiceVideoPanel({
   } | null>(null);
   const resizeStateRef = useRef<{
     pointerId: number;
-    edge: 'nw' | 'w' | 'n' | 'se';
+    edge: ResizeEdge;
     startX: number;
     startY: number;
     startRect: DOMRect;
-    hadDragPos: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -178,9 +181,6 @@ export function VoiceVideoPanel({
     const reclamp = () => {
       const mobile = window.innerWidth < 640;
       setIsMobileViewport(mobile);
-      if (mobile) {
-        setDragPos((prev) => (prev !== null ? null : prev));
-      }
       setPanelSize((prev) => {
         if (!prev) return prev;
         const clamped = clampPanelSize(prev.width, prev.height);
@@ -188,19 +188,17 @@ export function VoiceVideoPanel({
           ? prev
           : clamped;
       });
-      if (!mobile) {
-        const rect = el.getBoundingClientRect();
-        setDragPos((prev) => {
-          if (!prev) return prev;
-          const clamped = clampPositionToViewport(
-            prev.x,
-            prev.y,
-            rect.width,
-            rect.height,
-          );
-          return clamped.x === prev.x && clamped.y === prev.y ? prev : clamped;
-        });
-      }
+      const rect = el.getBoundingClientRect();
+      setDragPos((prev) => {
+        if (!prev) return prev;
+        const clamped = clampPositionToViewport(
+          prev.x,
+          prev.y,
+          rect.width,
+          rect.height,
+        );
+        return clamped.x === prev.x && clamped.y === prev.y ? prev : clamped;
+      });
     };
 
     const rafId = requestAnimationFrame(reclamp);
@@ -506,7 +504,7 @@ export function VoiceVideoPanel({
   };
 
   const handleDragPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (typeof window === 'undefined' || window.innerWidth < 640) return;
+    if (typeof window === 'undefined') return;
     if ((e.target as HTMLElement).closest('button')) return;
 
     const el = panelRef.current;
@@ -546,7 +544,7 @@ export function VoiceVideoPanel({
 
   const handleResizePointerDown = (
     e: React.PointerEvent<HTMLDivElement>,
-    edge: 'nw' | 'w' | 'n' | 'se',
+    edge: ResizeEdge,
   ) => {
     e.preventDefault();
     e.stopPropagation();
@@ -558,7 +556,6 @@ export function VoiceVideoPanel({
       startX: e.clientX,
       startY: e.clientY,
       startRect: el.getBoundingClientRect(),
-      hadDragPos: dragPos !== null,
     };
     e.currentTarget.setPointerCapture(e.pointerId);
   };
@@ -571,39 +568,58 @@ export function VoiceVideoPanel({
 
     const dx = e.clientX - rs.startX;
     const dy = e.clientY - rs.startY;
-    const { startRect, edge, hadDragPos } = rs;
+    const { startRect, edge } = rs;
+    const margin = 8;
 
-    let rawWidth = startRect.width;
-    let rawHeight = startRect.height;
+    const maxWidthAllowed = Math.max(MIN_PANEL_WIDTH, window.innerWidth - margin * 2);
+    const maxHeightAllowed = Math.max(MIN_PANEL_HEIGHT, window.innerHeight - margin * 2);
 
-    if (edge === 'nw' || edge === 'w') {
-      rawWidth = startRect.width - dx;
-    } else if (edge === 'se') {
-      rawWidth = startRect.width + dx;
-    }
+    let left = startRect.left;
+    let right = startRect.right;
+    let top = startRect.top;
+    let bottom = startRect.bottom;
 
-    if (edge === 'nw' || edge === 'n') {
-      rawHeight = startRect.height - dy;
-    } else if (edge === 'se') {
-      rawHeight = startRect.height + dy;
-    }
-
-    const clamped = clampPanelSize(rawWidth, rawHeight);
-    setPanelSize(clamped);
-
-    if (hadDragPos && window.innerWidth >= 640) {
-      let nextX = startRect.left;
-      let nextY = startRect.top;
-      if (edge === 'nw' || edge === 'w') {
-        nextX = startRect.right - clamped.width;
-      }
-      if (edge === 'nw' || edge === 'n') {
-        nextY = startRect.bottom - clamped.height;
-      }
-      setDragPos(
-        clampPositionToViewport(nextX, nextY, clamped.width, clamped.height),
+    if (edge.includes('w')) {
+      left = Math.min(
+        Math.max(margin, startRect.left + dx),
+        startRect.right - MIN_PANEL_WIDTH,
       );
+      if (right - left > maxWidthAllowed) {
+        left = right - maxWidthAllowed;
+      }
     }
+    if (edge.includes('e')) {
+      right = Math.max(
+        Math.min(window.innerWidth - margin, startRect.right + dx),
+        left + MIN_PANEL_WIDTH,
+      );
+      if (right - left > maxWidthAllowed) {
+        right = left + maxWidthAllowed;
+      }
+    }
+    if (edge.includes('n')) {
+      top = Math.min(
+        Math.max(margin, startRect.top + dy),
+        startRect.bottom - MIN_PANEL_HEIGHT,
+      );
+      if (bottom - top > maxHeightAllowed) {
+        top = bottom - maxHeightAllowed;
+      }
+    }
+    if (edge.includes('s')) {
+      bottom = Math.max(
+        Math.min(window.innerHeight - margin, startRect.bottom + dy),
+        top + MIN_PANEL_HEIGHT,
+      );
+      if (bottom - top > maxHeightAllowed) {
+        bottom = top + maxHeightAllowed;
+      }
+    }
+
+    const width = Math.round(right - left);
+    const height = Math.round(bottom - top);
+    setPanelSize({ width, height });
+    setDragPos({ x: Math.round(left), y: Math.round(top) });
   };
 
   const handleResizePointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -670,9 +686,19 @@ export function VoiceVideoPanel({
   const hasStreams = Boolean(localStream) || visibleRemotePeers.length > 0;
   const totalTileCount = (localStream ? 1 : 0) + visibleRemotePeers.length;
   const activeExpanded = !minimized && hasStreams;
+  const defaultWidth = isMobileViewport ? (totalTileCount <= 1 ? 212 : 248) : 348;
+  const currentWidth = panelSize?.width ?? defaultWidth;
+  const isCompactWidth = activeExpanded && currentWidth < 305;
+  const gridCols =
+    totalTileCount <= 1
+      ? 1
+      : currentWidth >= 480 && totalTileCount >= 3
+        ? Math.min(3, totalTileCount)
+        : 2;
+  const gridRows = Math.max(1, Math.ceil(totalTileCount / gridCols));
 
   const panelStyle: React.CSSProperties = {
-    ...(dragPos && !isMobileViewport
+    ...(dragPos
       ? {
           left: `${dragPos.x}px`,
           top: `${dragPos.y}px`,
@@ -682,9 +708,9 @@ export function VoiceVideoPanel({
       : undefined),
     ...(activeExpanded && panelSize
       ? {
-          ...(isMobileViewport ? {} : { width: `${panelSize.width}px` }),
+          width: `${panelSize.width}px`,
           height: `${panelSize.height}px`,
-          maxHeight: isMobileViewport ? '72dvh' : '82dvh',
+          maxHeight: 'calc(100dvh - 1rem)',
         }
       : undefined),
   };
@@ -694,77 +720,102 @@ export function VoiceVideoPanel({
       ref={panelRef}
       aria-label="Floating voice and video chat"
       style={panelStyle}
-      className={`fixed inset-x-2 bottom-2 z-40 mx-auto flex max-h-[48dvh] w-auto max-w-lg flex-col rounded-2xl border border-slate-200/90 bg-white/95 shadow-2xl backdrop-blur-md transition-shadow sm:inset-x-auto sm:right-4 sm:bottom-4 sm:mx-0 sm:max-h-[calc(100dvh-5.5rem)] sm:max-w-[calc(100vw-1rem)] dark:border-slate-700/90 dark:bg-slate-900/95 ${
+      className={`fixed right-2 bottom-2 z-40 flex max-h-[56dvh] max-w-[calc(100vw-1rem)] flex-col rounded-2xl border border-slate-200/90 bg-white/95 shadow-2xl backdrop-blur-md transition-shadow sm:right-4 sm:bottom-4 sm:max-h-[calc(100dvh-2rem)] dark:border-slate-700/90 dark:bg-slate-900/95 ${
         activeExpanded
           ? panelSize
             ? ''
-            : 'sm:w-[348px]'
-          : 'sm:w-auto'
+            : totalTileCount <= 1
+              ? 'w-[212px] sm:w-[348px]'
+              : 'w-[248px] sm:w-[348px]'
+          : 'w-auto'
       }`}
     >
-      {/* Mobile Top Height Resize Handle */}
-      {activeExpanded && (
-        <div
-          onPointerDown={(e) => handleResizePointerDown(e, 'n')}
-          onPointerMove={handleResizePointerMove}
-          onPointerUp={handleResizePointerEnd}
-          onPointerCancel={handleResizePointerEnd}
-          onDoubleClick={() => setPanelSize(null)}
-          role="separator"
-          aria-orientation="horizontal"
-          aria-label="Drag to resize voice and video height"
-          title="Drag up or down to resize"
-          className="flex cursor-ns-resize touch-none items-center justify-center pt-1.5 pb-0.5 sm:hidden"
-        >
-          <span className="h-1 w-10 rounded-full bg-slate-300 dark:bg-slate-600" />
-        </div>
-      )}
-
-      {/* Desktop Edge & Corner Resize Handles */}
+      {/* 8-Way Edge & Corner Resize Handles (Mobile + Desktop) */}
       {activeExpanded && (
         <>
-          <div
-            onPointerDown={(e) => handleResizePointerDown(e, 'nw')}
-            onPointerMove={handleResizePointerMove}
-            onPointerUp={handleResizePointerEnd}
-            onPointerCancel={handleResizePointerEnd}
-            onDoubleClick={() => setPanelSize(null)}
-            title="Drag corner to resize · Double-click to reset"
-            aria-label="Drag top-left corner to resize"
-            className="hidden sm:flex sm:absolute sm:top-0.5 sm:left-0.5 sm:z-20 sm:h-4 sm:w-4 sm:cursor-nwse-resize sm:touch-none sm:items-start sm:justify-start sm:rounded-tl-2xl sm:p-1"
-          >
-            <span className="h-2 w-2 rounded-tl-xs border-t-2 border-l-2 border-slate-400/70 dark:border-slate-500/80" />
-          </div>
-          <div
-            onPointerDown={(e) => handleResizePointerDown(e, 'w')}
-            onPointerMove={handleResizePointerMove}
-            onPointerUp={handleResizePointerEnd}
-            onPointerCancel={handleResizePointerEnd}
-            onDoubleClick={() => setPanelSize(null)}
-            title="Drag left edge to resize width"
-            className="hidden sm:block sm:absolute sm:top-4 sm:bottom-4 sm:left-0 sm:z-10 sm:w-1.5 sm:cursor-ew-resize sm:touch-none"
-          />
+          {/* Edges */}
           <div
             onPointerDown={(e) => handleResizePointerDown(e, 'n')}
             onPointerMove={handleResizePointerMove}
             onPointerUp={handleResizePointerEnd}
             onPointerCancel={handleResizePointerEnd}
             onDoubleClick={() => setPanelSize(null)}
-            title="Drag top edge to resize height"
-            className="hidden sm:block sm:absolute sm:top-0 sm:right-4 sm:left-4 sm:z-10 sm:h-1.5 sm:cursor-ns-resize sm:touch-none"
+            title="Drag top edge to resize"
+            className="absolute top-0 right-4 left-4 z-20 h-2.5 cursor-ns-resize touch-none"
           />
-          {dragPos && (
-            <div
-              onPointerDown={(e) => handleResizePointerDown(e, 'se')}
-              onPointerMove={handleResizePointerMove}
-              onPointerUp={handleResizePointerEnd}
-              onPointerCancel={handleResizePointerEnd}
-              onDoubleClick={() => setPanelSize(null)}
-              title="Drag bottom-right corner to resize"
-              aria-label="Drag bottom-right corner to resize"
-              className="hidden sm:block sm:absolute sm:right-0 sm:bottom-0 sm:z-20 sm:h-3.5 sm:w-3.5 sm:cursor-nwse-resize sm:touch-none sm:rounded-br-2xl"
-            />
-          )}
+          <div
+            onPointerDown={(e) => handleResizePointerDown(e, 's')}
+            onPointerMove={handleResizePointerMove}
+            onPointerUp={handleResizePointerEnd}
+            onPointerCancel={handleResizePointerEnd}
+            onDoubleClick={() => setPanelSize(null)}
+            title="Drag bottom edge to resize"
+            className="absolute right-4 bottom-0 left-4 z-20 h-2.5 cursor-ns-resize touch-none"
+          />
+          <div
+            onPointerDown={(e) => handleResizePointerDown(e, 'w')}
+            onPointerMove={handleResizePointerMove}
+            onPointerUp={handleResizePointerEnd}
+            onPointerCancel={handleResizePointerEnd}
+            onDoubleClick={() => setPanelSize(null)}
+            title="Drag left edge to resize"
+            className="absolute top-4 bottom-4 left-0 z-20 w-2.5 cursor-ew-resize touch-none"
+          />
+          <div
+            onPointerDown={(e) => handleResizePointerDown(e, 'e')}
+            onPointerMove={handleResizePointerMove}
+            onPointerUp={handleResizePointerEnd}
+            onPointerCancel={handleResizePointerEnd}
+            onDoubleClick={() => setPanelSize(null)}
+            title="Drag right edge to resize"
+            className="absolute top-4 right-0 bottom-4 z-20 w-2.5 cursor-ew-resize touch-none"
+          />
+
+          {/* Corners */}
+          <div
+            onPointerDown={(e) => handleResizePointerDown(e, 'nw')}
+            onPointerMove={handleResizePointerMove}
+            onPointerUp={handleResizePointerEnd}
+            onPointerCancel={handleResizePointerEnd}
+            onDoubleClick={() => setPanelSize(null)}
+            title="Drag top-left corner to resize · Double-click to reset"
+            aria-label="Drag top-left corner to resize"
+            className="absolute top-0 left-0 z-30 flex h-5 w-5 cursor-nwse-resize touch-none items-start justify-start rounded-tl-2xl p-1"
+          >
+            <span className="h-2 w-2 rounded-tl-xs border-t-2 border-l-2 border-slate-400/80 dark:border-slate-500/90" />
+          </div>
+          <div
+            onPointerDown={(e) => handleResizePointerDown(e, 'ne')}
+            onPointerMove={handleResizePointerMove}
+            onPointerUp={handleResizePointerEnd}
+            onPointerCancel={handleResizePointerEnd}
+            onDoubleClick={() => setPanelSize(null)}
+            title="Drag top-right corner to resize"
+            aria-label="Drag top-right corner to resize"
+            className="absolute top-0 right-0 z-30 h-5 w-5 cursor-nesw-resize touch-none rounded-tr-2xl"
+          />
+          <div
+            onPointerDown={(e) => handleResizePointerDown(e, 'sw')}
+            onPointerMove={handleResizePointerMove}
+            onPointerUp={handleResizePointerEnd}
+            onPointerCancel={handleResizePointerEnd}
+            onDoubleClick={() => setPanelSize(null)}
+            title="Drag bottom-left corner to resize"
+            aria-label="Drag bottom-left corner to resize"
+            className="absolute bottom-0 left-0 z-30 h-5 w-5 cursor-nesw-resize touch-none rounded-bl-2xl"
+          />
+          <div
+            onPointerDown={(e) => handleResizePointerDown(e, 'se')}
+            onPointerMove={handleResizePointerMove}
+            onPointerUp={handleResizePointerEnd}
+            onPointerCancel={handleResizePointerEnd}
+            onDoubleClick={() => setPanelSize(null)}
+            title="Drag bottom-right corner to resize"
+            aria-label="Drag bottom-right corner to resize"
+            className="absolute right-0 bottom-0 z-30 flex h-5 w-5 cursor-nwse-resize touch-none items-end justify-end rounded-br-2xl p-1"
+          >
+            <span className="h-2 w-2 rounded-br-xs border-r-2 border-b-2 border-slate-400/80 dark:border-slate-500/90" />
+          </div>
         </>
       )}
       {/* Keep remote audio playing seamlessly even when minimized */}
@@ -781,35 +832,37 @@ export function VoiceVideoPanel({
         </div>
       )}
 
-      {/* Floating Header / Control Bar (Draggable on >= sm) */}
+      {/* Floating Header / Control Bar (Draggable on Mobile + Desktop) */}
       <div
         onPointerDown={handleDragPointerDown}
         onPointerMove={handleDragPointerMove}
         onPointerUp={handleDragPointerEnd}
         onPointerCancel={handleDragPointerEnd}
         onDoubleClick={() => setDragPos(null)}
-        className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:cursor-grab sm:touch-none sm:active:cursor-grabbing"
+        className="flex cursor-grab touch-none flex-wrap items-center justify-between gap-1 px-2.5 py-2 active:cursor-grabbing sm:gap-1.5"
         title={dragPos ? 'Drag to move · Double-click to reset dock' : 'Drag to move'}
       >
-        <div className="flex min-w-0 items-center gap-1.5">
-          <GripHorizontal className="hidden h-3.5 w-3.5 shrink-0 text-slate-400 sm:inline" />
-          <Headphones className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
-          <h2 className="truncate text-xs font-bold tracking-wide text-slate-700 uppercase dark:text-slate-200">
-            Voice &amp; Video
-          </h2>
+        <div className="flex min-w-0 items-center gap-1">
+          <GripHorizontal className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+          <Headphones className="hidden h-3.5 w-3.5 shrink-0 text-indigo-500 sm:inline" />
+          {!isCompactWidth && (
+            <h2 className="hidden truncate text-[11px] font-bold tracking-wide text-slate-700 uppercase sm:inline dark:text-slate-200">
+              Voice &amp; Video
+            </h2>
+          )}
           {visibleRemotePeers.length > 0 && (
-            <span className="shrink-0 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+            <span className="shrink-0 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
               {visibleRemotePeers.length} live
             </span>
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+        <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
             disabled={!supportsWebRtcMedia || !connected || busy}
             onClick={() => void handleToggleMic()}
-            className={`inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 sm:px-2.5 ${
+            className={`inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[11px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 sm:px-2 ${
               audioEnabled
                 ? 'bg-emerald-600 text-white hover:bg-emerald-500'
                 : 'border border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
@@ -818,14 +871,16 @@ export function VoiceVideoPanel({
             aria-label={audioEnabled ? 'Mute microphone' : 'Turn on microphone'}
           >
             {audioEnabled ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
-            <span>{audioEnabled ? 'On' : 'Mic'}</span>
+            {!isCompactWidth && (
+              <span className="hidden sm:inline">{audioEnabled ? 'On' : 'Mic'}</span>
+            )}
           </button>
 
           <button
             type="button"
             disabled={!supportsWebRtcMedia || !connected || busy}
             onClick={() => void handleToggleVideo()}
-            className={`inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 sm:px-2.5 ${
+            className={`inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[11px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 sm:px-2 ${
               videoEnabled
                 ? 'bg-indigo-600 text-white hover:bg-indigo-500'
                 : 'border border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
@@ -834,13 +889,15 @@ export function VoiceVideoPanel({
             aria-label={videoEnabled ? 'Turn off camera' : 'Turn on camera'}
           >
             {videoEnabled ? <Video className="h-3.5 w-3.5" /> : <VideoOff className="h-3.5 w-3.5" />}
-            <span>{videoEnabled ? 'On' : 'Cam'}</span>
+            {!isCompactWidth && (
+              <span className="hidden sm:inline">{videoEnabled ? 'On' : 'Cam'}</span>
+            )}
           </button>
 
           <button
             type="button"
             onClick={() => setDeafened((d) => !d)}
-            className={`rounded-xl p-1.5 transition ${
+            className={`rounded-lg p-1.5 transition ${
               deafened
                 ? 'bg-amber-500/20 text-amber-600 dark:text-amber-300'
                 : 'border border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
@@ -855,7 +912,7 @@ export function VoiceVideoPanel({
             <button
               type="button"
               onClick={stopAllLocalMedia}
-              className="rounded-xl bg-rose-600 p-1.5 text-white transition hover:bg-rose-500"
+              className="rounded-lg bg-rose-600 p-1.5 text-white transition hover:bg-rose-500"
               title="Turn off mic & camera"
               aria-label="Leave voice and video call"
             >
@@ -867,7 +924,7 @@ export function VoiceVideoPanel({
             <button
               type="button"
               onClick={handleToggleSizePreset}
-              className="rounded-xl border border-slate-300 p-1.5 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="rounded-lg border border-slate-300 p-1.5 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               title={panelSize ? 'Reset dock size' : 'Expand dock size'}
               aria-label={panelSize ? 'Reset voice and video dock size' : 'Expand voice and video dock size'}
             >
@@ -883,7 +940,7 @@ export function VoiceVideoPanel({
             <button
               type="button"
               onClick={() => setMinimized((m) => !m)}
-              className="rounded-xl border border-slate-300 p-1.5 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="rounded-lg border border-slate-300 p-1.5 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               title={minimized ? 'Show video & voice tiles' : 'Minimize to floating bar'}
               aria-label={minimized ? 'Expand voice and video panel' : 'Minimize voice and video panel'}
             >
@@ -917,22 +974,23 @@ export function VoiceVideoPanel({
         </div>
       )}
 
-      {/* Scrollable Video/Voice Tile Grid (stays bounded inside viewport) */}
+      {/* Adaptive Video/Voice Tile Grid (scales smoothly with resize, no ugly scrollbar) */}
       {!minimized && hasStreams && (
-        <div className="min-h-0 flex-1 overflow-y-auto border-t border-slate-200/80 p-2.5 dark:border-slate-800">
+        <div className="min-h-0 flex-1 overflow-y-auto border-t border-slate-200/80 p-2 dark:border-slate-800">
           <div
-            className="grid gap-2"
+            className="grid h-full w-full gap-2"
             style={{
-              gridTemplateColumns:
-                totalTileCount === 1
-                  ? '1fr'
-                  : 'repeat(auto-fit, minmax(140px, 1fr))',
+              gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`,
+              gridTemplateRows:
+                gridRows === 1 && panelSize
+                  ? 'minmax(0, 1fr)'
+                  : `repeat(${gridRows}, minmax(${panelSize ? 54 : isMobileViewport ? 88 : 116}px, 1fr))`,
             }}
           >
             {localStream && (
-              <div className="relative overflow-hidden rounded-xl border border-indigo-500/40 bg-slate-950">
+              <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-indigo-500/40 bg-slate-950">
                 {videoEnabled && isStreamHasLiveVideo(localStream) ? (
-                  <div className="aspect-video w-full">
+                  <div className="min-h-0 w-full flex-1">
                     <MediaStreamView
                       stream={localStream}
                       hasVideo
@@ -941,7 +999,7 @@ export function VoiceVideoPanel({
                     />
                   </div>
                 ) : (
-                  <div className="flex aspect-video w-full flex-col items-center justify-center gap-1 bg-slate-900 text-slate-200">
+                  <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-1 bg-slate-900 text-slate-200">
                     <span className="text-xl sm:text-2xl" aria-hidden="true">
                       {selfAvatar}
                     </span>
@@ -950,7 +1008,7 @@ export function VoiceVideoPanel({
                     </span>
                   </div>
                 )}
-                <div className="flex items-center justify-between gap-1 bg-slate-950/90 px-2 py-1 text-[10px] text-white">
+                <div className="flex shrink-0 items-center justify-between gap-1 bg-slate-950/90 px-2 py-1 text-[10px] text-white">
                   <span className="truncate font-semibold">
                     {selfDisplayName} (You)
                   </span>
@@ -971,10 +1029,10 @@ export function VoiceVideoPanel({
                 return (
                   <div
                     key={peerId}
-                    className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-950 dark:border-slate-700"
+                    className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-slate-950 dark:border-slate-700"
                   >
                     {hasVideo ? (
-                      <div className="aspect-video w-full">
+                      <div className="min-h-0 w-full flex-1">
                         <MediaStreamView
                           stream={stream}
                           hasVideo
@@ -982,7 +1040,7 @@ export function VoiceVideoPanel({
                         />
                       </div>
                     ) : (
-                      <div className="flex aspect-video w-full flex-col items-center justify-center gap-1 bg-slate-900 text-slate-200">
+                      <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-1 bg-slate-900 text-slate-200">
                         <MediaStreamView
                           stream={stream}
                           hasVideo={false}
@@ -997,7 +1055,7 @@ export function VoiceVideoPanel({
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between gap-1 bg-slate-950/90 px-2 py-1 text-[10px] text-white">
+                    <div className="flex shrink-0 items-center justify-between gap-1 bg-slate-950/90 px-2 py-1 text-[10px] text-white">
                       <span className="truncate font-semibold">
                         {participant.displayName}
                       </span>
