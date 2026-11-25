@@ -156,6 +156,14 @@ export function VoiceVideoPanel({
   const audioEnabledRef = useRef(false);
   const videoEnabledRef = useRef(false);
   const panelRef = useRef<HTMLElement | null>(null);
+  const controlsScrollRef = useRef<HTMLDivElement | null>(null);
+  const controlsDragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startScrollLeft: number;
+    moved: boolean;
+  } | null>(null);
+  const controlsDidDragRef = useRef(false);
   const dragStateRef = useRef<{
     pointerId: number;
     offsetX: number;
@@ -798,7 +806,7 @@ export function VoiceVideoPanel({
             className="absolute top-4 right-0 bottom-4 z-20 w-2.5 cursor-ew-resize touch-none"
           />
 
-          {/* Corners */}
+          {/* Corners (sleek curved grips matching rounded-2xl radius) */}
           <div
             onPointerDown={(e) => handleResizePointerDown(e, 'nw')}
             onPointerMove={handleResizePointerMove}
@@ -807,9 +815,21 @@ export function VoiceVideoPanel({
             onDoubleClick={() => setPanelSize(null)}
             title="Drag top-left corner to resize · Double-click to reset"
             aria-label="Drag top-left corner to resize"
-            className="absolute top-0 left-0 z-30 flex h-5 w-5 cursor-nwse-resize touch-none items-start justify-start rounded-tl-2xl p-1"
+            className="group/corner absolute top-0 left-0 z-30 flex h-6 w-6 cursor-nwse-resize touch-none items-start justify-start rounded-tl-2xl p-1 text-slate-400/65 transition-all hover:text-indigo-500 dark:text-slate-500/75 dark:hover:text-indigo-400"
           >
-            <span className="h-2 w-2 rounded-tl-xs border-t-2 border-l-2 border-slate-400/80 dark:border-slate-500/90" />
+            <svg
+              viewBox="0 0 16 16"
+              className="h-3.5 w-3.5 transition-transform group-hover/corner:scale-110"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M 2.5 11 L 2.5 7.5 Q 2.5 2.5 7.5 2.5 L 11 2.5"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
           </div>
           <div
             onPointerDown={(e) => handleResizePointerDown(e, 'ne')}
@@ -819,8 +839,22 @@ export function VoiceVideoPanel({
             onDoubleClick={() => setPanelSize(null)}
             title="Drag top-right corner to resize"
             aria-label="Drag top-right corner to resize"
-            className="absolute top-0 right-0 z-30 h-5 w-5 cursor-nesw-resize touch-none rounded-tr-2xl"
-          />
+            className="group/corner absolute top-0 right-0 z-30 flex h-6 w-6 cursor-nesw-resize touch-none items-start justify-end rounded-tr-2xl p-1 text-transparent transition-all hover:text-indigo-500 dark:hover:text-indigo-400"
+          >
+            <svg
+              viewBox="0 0 16 16"
+              className="h-3.5 w-3.5 transition-transform group-hover/corner:scale-110"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M 5 2.5 L 8.5 2.5 Q 13.5 2.5 13.5 7.5 L 13.5 11"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
           <div
             onPointerDown={(e) => handleResizePointerDown(e, 'sw')}
             onPointerMove={handleResizePointerMove}
@@ -829,8 +863,22 @@ export function VoiceVideoPanel({
             onDoubleClick={() => setPanelSize(null)}
             title="Drag bottom-left corner to resize"
             aria-label="Drag bottom-left corner to resize"
-            className="absolute bottom-0 left-0 z-30 h-5 w-5 cursor-nesw-resize touch-none rounded-bl-2xl"
-          />
+            className="group/corner absolute bottom-0 left-0 z-30 flex h-6 w-6 cursor-nesw-resize touch-none items-end justify-start rounded-bl-2xl p-1 text-transparent transition-all hover:text-indigo-500 dark:hover:text-indigo-400"
+          >
+            <svg
+              viewBox="0 0 16 16"
+              className="h-3.5 w-3.5 transition-transform group-hover/corner:scale-110"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M 2.5 5 L 2.5 8.5 Q 2.5 13.5 7.5 13.5 L 11 13.5"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
           <div
             onPointerDown={(e) => handleResizePointerDown(e, 'se')}
             onPointerMove={handleResizePointerMove}
@@ -839,9 +887,21 @@ export function VoiceVideoPanel({
             onDoubleClick={() => setPanelSize(null)}
             title="Drag bottom-right corner to resize"
             aria-label="Drag bottom-right corner to resize"
-            className="absolute right-0 bottom-0 z-30 flex h-5 w-5 cursor-nwse-resize touch-none items-end justify-end rounded-br-2xl p-1"
+            className="group/corner absolute right-0 bottom-0 z-30 flex h-6 w-6 cursor-nwse-resize touch-none items-end justify-end rounded-br-2xl p-1 text-slate-400/65 transition-all hover:text-indigo-500 dark:text-slate-500/75 dark:hover:text-indigo-400"
           >
-            <span className="h-2 w-2 rounded-br-xs border-r-2 border-b-2 border-slate-400/80 dark:border-slate-500/90" />
+            <svg
+              viewBox="0 0 16 16"
+              className="h-3.5 w-3.5 transition-transform group-hover/corner:scale-110"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M 5 13.5 L 8.5 13.5 Q 13.5 13.5 13.5 8.5 L 13.5 5"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
           </div>
         </>
       )}
@@ -885,13 +945,63 @@ export function VoiceVideoPanel({
         </div>
 
         <div
-          onPointerDown={(e) => e.stopPropagation()}
+          ref={controlsScrollRef}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            if (e.pointerType === 'touch') return;
+            controlsDidDragRef.current = false;
+            controlsDragRef.current = {
+              pointerId: e.pointerId,
+              startX: e.clientX,
+              startScrollLeft: e.currentTarget.scrollLeft,
+              moved: false,
+            };
+          }}
+          onPointerMove={(e) => {
+            const drag = controlsDragRef.current;
+            if (!drag || drag.pointerId !== e.pointerId) return;
+            const dx = e.clientX - drag.startX;
+            if (!drag.moved && Math.abs(dx) > 4) {
+              drag.moved = true;
+              controlsDidDragRef.current = true;
+              if (!e.currentTarget.hasPointerCapture(e.pointerId)) {
+                e.currentTarget.setPointerCapture(e.pointerId);
+              }
+            }
+            if (drag.moved) {
+              e.currentTarget.scrollLeft = drag.startScrollLeft - dx;
+            }
+          }}
+          onPointerUp={(e) => {
+            if (controlsDragRef.current?.pointerId === e.pointerId) {
+              controlsDragRef.current = null;
+              if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                e.currentTarget.releasePointerCapture(e.pointerId);
+              }
+            }
+          }}
+          onPointerCancel={(e) => {
+            if (controlsDragRef.current?.pointerId === e.pointerId) {
+              controlsDragRef.current = null;
+              if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                e.currentTarget.releasePointerCapture(e.pointerId);
+              }
+            }
+          }}
+          onClickCapture={(e) => {
+            if (controlsDidDragRef.current) {
+              e.preventDefault();
+              e.stopPropagation();
+              controlsDidDragRef.current = false;
+            }
+          }}
           onWheel={(e) => {
             if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
               e.currentTarget.scrollLeft += e.deltaY;
             }
           }}
-          className="min-w-0 flex-1 touch-pan-x overflow-x-auto pb-0.5 [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400/50"
+          title="Drag horizontally or scroll to view all controls"
+          className="min-w-0 flex-1 cursor-grab touch-pan-x overflow-x-auto select-none active:cursor-grabbing [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           <div className="flex w-max min-w-full items-center justify-end gap-1">
           <button
@@ -1039,9 +1149,9 @@ export function VoiceVideoPanel({
         </div>
       )}
 
-      {/* Adaptive Video/Voice Tile Grid (scales smoothly with resize, no ugly scrollbar) */}
+      {/* Adaptive Video/Voice Tile Grid (scales smoothly with resize, thin translucent scrollbar only when needed) */}
       {!minimized && hasStreams && (
-        <div className="min-h-0 flex-1 overflow-y-auto border-t border-slate-200/80 p-2 dark:border-slate-800">
+        <div className="min-h-0 flex-1 overflow-y-auto border-t border-slate-200/80 p-2 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-button]:hidden [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400/45 [&::-webkit-scrollbar-track]:bg-transparent dark:border-slate-800">
           <div
             className="grid h-full w-full gap-2"
             style={{
