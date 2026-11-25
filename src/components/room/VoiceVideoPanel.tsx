@@ -11,6 +11,8 @@ import {
   MicOff,
   Minimize2,
   PhoneOff,
+  User,
+  Users,
   Video,
   VideoOff,
   Volume2,
@@ -140,6 +142,8 @@ export function VoiceVideoPanel({
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [minimized, setMinimized] = useState(false);
+  const [singleView, setSingleView] = useState(false);
+  const [focusedPeerId, setFocusedPeerId] = useState<string | null>(null);
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const [panelSize, setPanelSize] = useState<{
     width: number;
@@ -684,18 +688,41 @@ export function VoiceVideoPanel({
 
   const callActive = audioEnabled || videoEnabled || localStream !== null;
   const hasStreams = Boolean(localStream) || visibleRemotePeers.length > 0;
-  const totalTileCount = (localStream ? 1 : 0) + visibleRemotePeers.length;
   const activeExpanded = !minimized && hasStreams;
-  const defaultWidth = isMobileViewport ? (totalTileCount <= 1 ? 212 : 248) : 348;
+
+  const singleRemotePeer = useMemo(() => {
+    if (!singleView || visibleRemotePeers.length === 0) return null;
+    return (
+      visibleRemotePeers.find((p) => p.peerId === focusedPeerId) ??
+      visibleRemotePeers.find((p) => p.hasVideo) ??
+      visibleRemotePeers[0] ??
+      null
+    );
+  }, [singleView, visibleRemotePeers, focusedPeerId]);
+
+  const showLocalTile = Boolean(localStream) && (!singleView || visibleRemotePeers.length === 0);
+  const displayedRemotePeers = singleView
+    ? singleRemotePeer
+      ? [singleRemotePeer]
+      : []
+    : visibleRemotePeers;
+  const hiddenAudioPeers = minimized
+    ? visibleRemotePeers
+    : singleView
+      ? visibleRemotePeers.filter((p) => p.peerId !== singleRemotePeer?.peerId)
+      : [];
+
+  const displayedTileCount = (showLocalTile ? 1 : 0) + displayedRemotePeers.length;
+  const defaultWidth = isMobileViewport ? (displayedTileCount <= 1 ? 212 : 248) : 348;
   const currentWidth = panelSize?.width ?? defaultWidth;
   const isCompactWidth = activeExpanded && currentWidth < 305;
   const gridCols =
-    totalTileCount <= 1
+    displayedTileCount <= 1
       ? 1
-      : currentWidth >= 480 && totalTileCount >= 3
-        ? Math.min(3, totalTileCount)
+      : currentWidth >= 480 && displayedTileCount >= 3
+        ? Math.min(3, displayedTileCount)
         : 2;
-  const gridRows = Math.max(1, Math.ceil(totalTileCount / gridCols));
+  const gridRows = Math.max(1, Math.ceil(displayedTileCount / gridCols));
 
   const panelStyle: React.CSSProperties = {
     ...(dragPos
@@ -724,7 +751,7 @@ export function VoiceVideoPanel({
         activeExpanded
           ? panelSize
             ? ''
-            : totalTileCount <= 1
+            : displayedTileCount <= 1
               ? 'w-[212px] sm:w-[348px]'
               : 'w-[248px] sm:w-[348px]'
           : 'w-auto'
@@ -818,10 +845,10 @@ export function VoiceVideoPanel({
           </div>
         </>
       )}
-      {/* Keep remote audio playing seamlessly even when minimized */}
-      {minimized && visibleRemotePeers.length > 0 && (
+      {/* Keep remote audio playing seamlessly when minimized or hidden in Single mode */}
+      {hiddenAudioPeers.length > 0 && (
         <div className="sr-only" aria-hidden="true">
-          {visibleRemotePeers.map(({ peerId, stream }) => (
+          {hiddenAudioPeers.map(({ peerId, stream }) => (
             <MediaStreamView
               key={`bg-audio-${peerId}`}
               stream={stream}
@@ -923,6 +950,34 @@ export function VoiceVideoPanel({
           {hasStreams && !minimized && (
             <button
               type="button"
+              onClick={() => setSingleView((s) => !s)}
+              className={`rounded-lg p-1.5 transition ${
+                singleView
+                  ? 'bg-sky-600 text-white hover:bg-sky-500'
+                  : 'border border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
+              }`}
+              title={
+                singleView
+                  ? 'Single cam view · Click to show both cams'
+                  : 'Both cams view · Click to show single cam only'
+              }
+              aria-label={
+                singleView
+                  ? 'Switch to both cameras view'
+                  : 'Switch to single camera view'
+              }
+            >
+              {singleView ? (
+                <User className="h-3.5 w-3.5" />
+              ) : (
+                <Users className="h-3.5 w-3.5" />
+              )}
+            </button>
+          )}
+
+          {hasStreams && !minimized && (
+            <button
+              type="button"
               onClick={handleToggleSizePreset}
               className="rounded-lg border border-slate-300 p-1.5 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               title={panelSize ? 'Reset dock size' : 'Expand dock size'}
@@ -987,7 +1042,7 @@ export function VoiceVideoPanel({
                   : `repeat(${gridRows}, minmax(${panelSize ? 54 : isMobileViewport ? 88 : 116}px, 1fr))`,
             }}
           >
-            {localStream && (
+            {showLocalTile && localStream && (
               <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-indigo-500/40 bg-slate-950">
                 {videoEnabled && isStreamHasLiveVideo(localStream) ? (
                   <div className="min-h-0 w-full flex-1">
@@ -1023,9 +1078,15 @@ export function VoiceVideoPanel({
               </div>
             )}
 
-            {visibleRemotePeers.map(
+            {displayedRemotePeers.map(
               ({ peerId, stream, participant, hasVideo, hasAudio }) => {
                 const isPeerMuted = deafened || Boolean(mutedPeers[peerId]);
+                const canCyclePeers = singleView && visibleRemotePeers.length > 1;
+                const cycleNextPeer = () => {
+                  const idx = visibleRemotePeers.findIndex((p) => p.peerId === peerId);
+                  const next = visibleRemotePeers[(idx + 1) % visibleRemotePeers.length];
+                  if (next) setFocusedPeerId(next.peerId);
+                };
                 return (
                   <div
                     key={peerId}
@@ -1060,6 +1121,16 @@ export function VoiceVideoPanel({
                         {participant.displayName}
                       </span>
                       <div className="flex shrink-0 items-center gap-1">
+                        {canCyclePeers && (
+                          <button
+                            type="button"
+                            onClick={cycleNextPeer}
+                            className="rounded bg-white/10 px-1 py-0.5 text-[9px] font-semibold text-slate-200 hover:bg-white/20"
+                            title="Switch visible participant"
+                          >
+                            Next
+                          </button>
+                        )}
                         {hasAudio ? (
                           <Mic className="h-3 w-3 text-emerald-400" />
                         ) : (
