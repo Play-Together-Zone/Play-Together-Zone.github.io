@@ -2,6 +2,9 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ChevronDown,
+  ChevronUp,
+  GripHorizontal,
   Headphones,
   Mic,
   MicOff,
@@ -80,6 +83,21 @@ function MediaStreamView({
   return <audio ref={audioRef} autoPlay playsInline muted={muted} />;
 }
 
+function clampPositionToViewport(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): { x: number; y: number } {
+  const margin = 8;
+  const maxX = Math.max(margin, window.innerWidth - width - margin);
+  const maxY = Math.max(margin, window.innerHeight - height - margin);
+  return {
+    x: Math.round(Math.min(Math.max(margin, x), maxX)),
+    y: Math.round(Math.min(Math.max(margin, y), maxY)),
+  };
+}
+
 export function VoiceVideoPanel({
   adapter,
   connected,
@@ -98,11 +116,19 @@ export function VoiceVideoPanel({
   const [remoteMediaStates, setRemoteMediaStates] = useState<Record<string, PeerMediaState>>({});
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [minimized, setMinimized] = useState(false);
+  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const [, setTrackTick] = useState(0);
 
   const localStreamRef = useRef<MediaStream | null>(null);
   const audioEnabledRef = useRef(false);
   const videoEnabledRef = useRef(false);
+  const panelRef = useRef<HTMLElement | null>(null);
+  const dragStateRef = useRef<{
+    pointerId: number;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
 
   useEffect(() => {
     audioEnabledRef.current = audioEnabled;
@@ -111,6 +137,40 @@ export function VoiceVideoPanel({
   useEffect(() => {
     videoEnabledRef.current = videoEnabled;
   }, [videoEnabled]);
+
+  // Keep dragged floating position strictly inside viewport on resize or panel size changes
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el || typeof window === 'undefined') return;
+
+    const reclamp = () => {
+      if (window.innerWidth < 640) {
+        setDragPos((prev) => (prev !== null ? null : prev));
+        return;
+      }
+      const rect = el.getBoundingClientRect();
+      setDragPos((prev) => {
+        if (!prev) return prev;
+        const clamped = clampPositionToViewport(
+          prev.x,
+          prev.y,
+          rect.width,
+          rect.height,
+        );
+        return clamped.x === prev.x && clamped.y === prev.y ? prev : clamped;
+      });
+    };
+
+    window.addEventListener('resize', reclamp);
+    const ro =
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(reclamp) : null;
+    ro?.observe(el);
+
+    return () => {
+      window.removeEventListener('resize', reclamp);
+      ro?.disconnect();
+    };
+  }, []);
 
   const supportsWebRtcMedia = Boolean(adapter?.supportsMedia);
 
@@ -349,6 +409,7 @@ export function VoiceVideoPanel({
       });
       const newAudioTracks = audioStream.getAudioTracks();
       const existingVideo = curStream?.getVideoTracks().filter((t) => t.readyState === 'live') ?? [];
+      setMinimized(false);
       await publishStream([...newAudioTracks, ...existingVideo], true, existingVideo.length > 0 && videoEnabled);
     } catch (err) {
       setMediaError(
@@ -389,6 +450,7 @@ export function VoiceVideoPanel({
       });
       const newVideoTracks = videoStream.getVideoTracks();
       const existingAudio = curStream?.getAudioTracks().filter((t) => t.readyState === 'live') ?? [];
+      setMinimized(false);
       await publishStream([...existingAudio, ...newVideoTracks], existingAudio.length > 0 && audioEnabled, true);
     } catch (err) {
       setMediaError(
@@ -396,6 +458,45 @@ export function VoiceVideoPanel({
       );
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleDragPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (typeof window === 'undefined' || window.innerWidth < 640) return;
+    if ((e.target as HTMLElement).closest('button')) return;
+
+    const el = panelRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    dragStateRef.current = {
+      pointerId: e.pointerId,
+      offsetX: e.clientX - rect.left,
+      offsetY: e.clientY - rect.top,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handleDragPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragStateRef.current;
+    const el = panelRef.current;
+    if (!drag || drag.pointerId !== e.pointerId || !el) return;
+
+    const rect = el.getBoundingClientRect();
+    const clamped = clampPositionToViewport(
+      e.clientX - drag.offsetX,
+      e.clientY - drag.offsetY,
+      rect.width,
+      rect.height,
+    );
+    setDragPos(clamped);
+  };
+
+  const handleDragPointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (dragStateRef.current?.pointerId === e.pointerId) {
+      dragStateRef.current = null;
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
     }
   };
 
@@ -428,36 +529,77 @@ export function VoiceVideoPanel({
         (item) =>
           (!item.participant.playerId ||
             !blockedPlayerIds.includes(item.participant.playerId)) &&
-          (item.hasVideo || item.hasAudio || item.stream.getTracks().some((t) => t.readyState === 'live')),
+          (item.hasVideo ||
+            item.hasAudio ||
+            item.stream.getTracks().some((t) => t.readyState === 'live')),
       );
   }, [remoteStreams, remoteMediaStates, snapshot, blockedPlayerIds]);
 
   const callActive = audioEnabled || videoEnabled || localStream !== null;
+  const hasStreams = Boolean(localStream) || visibleRemotePeers.length > 0;
+  const totalTileCount = (localStream ? 1 : 0) + visibleRemotePeers.length;
 
   return (
     <section
-      aria-label="Voice and video chat"
-      className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+      ref={panelRef}
+      aria-label="Floating voice and video chat"
+      style={
+        dragPos
+          ? {
+              left: `${dragPos.x}px`,
+              top: `${dragPos.y}px`,
+              right: 'auto',
+              bottom: 'auto',
+            }
+          : undefined
+      }
+      className={`fixed inset-x-2 bottom-2 z-40 mx-auto flex max-h-[48dvh] w-auto max-w-lg flex-col rounded-2xl border border-slate-200/90 bg-white/95 shadow-2xl backdrop-blur-md transition-shadow sm:inset-x-auto sm:right-4 sm:bottom-4 sm:mx-0 sm:max-h-[calc(100dvh-5.5rem)] dark:border-slate-700/90 dark:bg-slate-900/95 ${
+        hasStreams && !minimized ? 'sm:w-[348px]' : 'sm:w-auto'
+      }`}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          <Headphones className="h-3.5 w-3.5 text-indigo-500" />
-          <h2 className="text-xs font-bold tracking-wide text-slate-600 uppercase dark:text-slate-300">
+      {/* Keep remote audio playing seamlessly even when minimized */}
+      {minimized && visibleRemotePeers.length > 0 && (
+        <div className="sr-only" aria-hidden="true">
+          {visibleRemotePeers.map(({ peerId, stream }) => (
+            <MediaStreamView
+              key={`bg-audio-${peerId}`}
+              stream={stream}
+              hasVideo={false}
+              muted={deafened || Boolean(mutedPeers[peerId])}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Floating Header / Control Bar (Draggable on >= sm) */}
+      <div
+        onPointerDown={handleDragPointerDown}
+        onPointerMove={handleDragPointerMove}
+        onPointerUp={handleDragPointerEnd}
+        onPointerCancel={handleDragPointerEnd}
+        onDoubleClick={() => setDragPos(null)}
+        className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:cursor-grab sm:touch-none sm:active:cursor-grabbing"
+        title={dragPos ? 'Drag to move · Double-click to reset dock' : 'Drag to move'}
+      >
+        <div className="flex min-w-0 items-center gap-1.5">
+          <GripHorizontal className="hidden h-3.5 w-3.5 shrink-0 text-slate-400 sm:inline" />
+          <Headphones className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
+          <h2 className="truncate text-xs font-bold tracking-wide text-slate-700 uppercase dark:text-slate-200">
             Voice &amp; Video
           </h2>
           {visibleRemotePeers.length > 0 && (
-            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+            <span className="shrink-0 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
               {visibleRemotePeers.length} live
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
           <button
             type="button"
             disabled={!supportsWebRtcMedia || !connected || busy}
             onClick={() => void handleToggleMic()}
-            className={`inline-flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${
+            className={`inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 sm:px-2.5 ${
               audioEnabled
                 ? 'bg-emerald-600 text-white hover:bg-emerald-500'
                 : 'border border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
@@ -466,14 +608,14 @@ export function VoiceVideoPanel({
             aria-label={audioEnabled ? 'Mute microphone' : 'Turn on microphone'}
           >
             {audioEnabled ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
-            <span>{audioEnabled ? 'Mic On' : 'Mic'}</span>
+            <span>{audioEnabled ? 'On' : 'Mic'}</span>
           </button>
 
           <button
             type="button"
             disabled={!supportsWebRtcMedia || !connected || busy}
             onClick={() => void handleToggleVideo()}
-            className={`inline-flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${
+            className={`inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 sm:px-2.5 ${
               videoEnabled
                 ? 'bg-indigo-600 text-white hover:bg-indigo-500'
                 : 'border border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
@@ -482,7 +624,7 @@ export function VoiceVideoPanel({
             aria-label={videoEnabled ? 'Turn off camera' : 'Turn on camera'}
           >
             {videoEnabled ? <Video className="h-3.5 w-3.5" /> : <VideoOff className="h-3.5 w-3.5" />}
-            <span>{videoEnabled ? 'Cam On' : 'Cam'}</span>
+            <span>{videoEnabled ? 'On' : 'Cam'}</span>
           </button>
 
           <button
@@ -510,134 +652,160 @@ export function VoiceVideoPanel({
               <PhoneOff className="h-3.5 w-3.5" />
             </button>
           )}
+
+          {hasStreams && (
+            <button
+              type="button"
+              onClick={() => setMinimized((m) => !m)}
+              className="rounded-xl border border-slate-300 p-1.5 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              title={minimized ? 'Show video & voice tiles' : 'Minimize to floating bar'}
+              aria-label={minimized ? 'Expand voice and video panel' : 'Minimize voice and video panel'}
+            >
+              {minimized ? (
+                <ChevronUp className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5" />
+              )}
+            </button>
+          )}
         </div>
       </div>
 
-      {!supportsWebRtcMedia && connected && (
-        <p className="mt-2.5 rounded-xl bg-slate-100 px-3 py-2 text-[11px] text-slate-600 dark:bg-slate-800/70 dark:text-slate-400">
-          Voice &amp; video require a WebRTC transport (Torrent, Nostr, or MQTT) and are unavailable in Local Two-Tab mode.
+      {/* Notices & Errors */}
+      {!minimized && !supportsWebRtcMedia && connected && (
+        <p className="mx-3 mb-2.5 rounded-xl bg-slate-100 px-3 py-1.5 text-[11px] text-slate-600 dark:bg-slate-800/70 dark:text-slate-400">
+          Voice &amp; video require WebRTC (Torrent, Nostr, or MQTT); unavailable in Local Two-Tab mode.
         </p>
       )}
 
       {mediaError && (
-        <div className="mt-2.5 flex items-start justify-between gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-700 dark:text-rose-300">
+        <div className="mx-3 mb-2.5 flex items-start justify-between gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-[11px] text-rose-700 dark:text-rose-300">
           <span>{mediaError}</span>
           <button
             type="button"
             onClick={() => setMediaError(null)}
-            className="font-semibold hover:underline"
+            className="shrink-0 font-semibold hover:underline"
           >
             Dismiss
           </button>
         </div>
       )}
 
-      {(localStream || visibleRemotePeers.length > 0) && (
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          {localStream && (
-            <div className="relative overflow-hidden rounded-xl border border-indigo-500/30 bg-slate-950">
-              {videoEnabled && isStreamHasLiveVideo(localStream) ? (
-                <div className="aspect-video w-full">
-                  <MediaStreamView
-                    stream={localStream}
-                    hasVideo
-                    muted
-                    mirrored
-                  />
-                </div>
-              ) : (
-                <div className="flex aspect-video w-full flex-col items-center justify-center gap-1 bg-slate-900 text-slate-200">
-                  <span className="text-2xl" aria-hidden="true">
-                    {selfAvatar}
-                  </span>
-                  <span className="text-[10px] font-medium text-emerald-400">
-                    {audioEnabled ? 'Mic live' : 'Mic muted'}
-                  </span>
-                </div>
-              )}
-              <div className="flex items-center justify-between gap-1 bg-slate-950/85 px-2 py-1 text-[10px] text-white">
-                <span className="truncate font-semibold">
-                  {selfDisplayName} (You)
-                </span>
-                <span className="shrink-0">
-                  {audioEnabled ? (
-                    <Mic className="h-3 w-3 text-emerald-400" />
-                  ) : (
-                    <MicOff className="h-3 w-3 text-rose-400" />
-                  )}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {visibleRemotePeers.map(({ peerId, stream, participant, hasVideo, hasAudio }) => {
-            const isPeerMuted = deafened || Boolean(mutedPeers[peerId]);
-            return (
-              <div
-                key={peerId}
-                className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-950 dark:border-slate-700"
-              >
-                {hasVideo ? (
+      {/* Scrollable Video/Voice Tile Grid (stays bounded inside viewport) */}
+      {!minimized && hasStreams && (
+        <div className="min-h-0 flex-1 overflow-y-auto border-t border-slate-200/80 p-2.5 dark:border-slate-800">
+          <div
+            className={`grid gap-2 ${
+              totalTileCount === 1 ? 'grid-cols-1' : 'grid-cols-2'
+            }`}
+          >
+            {localStream && (
+              <div className="relative overflow-hidden rounded-xl border border-indigo-500/40 bg-slate-950">
+                {videoEnabled && isStreamHasLiveVideo(localStream) ? (
                   <div className="aspect-video w-full">
                     <MediaStreamView
-                      stream={stream}
+                      stream={localStream}
                       hasVideo
-                      muted={isPeerMuted}
+                      muted
+                      mirrored
                     />
                   </div>
                 ) : (
                   <div className="flex aspect-video w-full flex-col items-center justify-center gap-1 bg-slate-900 text-slate-200">
-                    <MediaStreamView
-                      stream={stream}
-                      hasVideo={false}
-                      muted={isPeerMuted}
-                    />
-                    <span className="text-2xl" aria-hidden="true">
-                      {participant.avatar}
+                    <span className="text-xl sm:text-2xl" aria-hidden="true">
+                      {selfAvatar}
                     </span>
-                    <span className="text-[10px] font-medium text-slate-300">
-                      {hasAudio ? 'Voice active' : 'Audio muted'}
+                    <span className="text-[10px] font-medium text-emerald-400">
+                      {audioEnabled ? 'Mic live' : 'Mic muted'}
                     </span>
                   </div>
                 )}
-
-                <div className="flex items-center justify-between gap-1 bg-slate-950/85 px-2 py-1 text-[10px] text-white">
+                <div className="flex items-center justify-between gap-1 bg-slate-950/90 px-2 py-1 text-[10px] text-white">
                   <span className="truncate font-semibold">
-                    {participant.displayName}
+                    {selfDisplayName} (You)
                   </span>
-                  <div className="flex shrink-0 items-center gap-1">
-                    {hasAudio ? (
+                  <span className="shrink-0">
+                    {audioEnabled ? (
                       <Mic className="h-3 w-3 text-emerald-400" />
                     ) : (
-                      <MicOff className="h-3 w-3 text-slate-400" />
+                      <MicOff className="h-3 w-3 text-rose-400" />
                     )}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setMutedPeers((prev) => ({
-                          ...prev,
-                          [peerId]: !prev[peerId],
-                        }))
-                      }
-                      className="rounded p-0.5 text-slate-300 hover:bg-white/10 hover:text-white"
-                      title={isPeerMuted ? 'Unmute peer' : 'Mute peer'}
-                      aria-label={
-                        isPeerMuted
-                          ? `Unmute ${participant.displayName}`
-                          : `Mute ${participant.displayName}`
-                      }
-                    >
-                      {isPeerMuted ? (
-                        <VolumeX className="h-3 w-3 text-amber-400" />
-                      ) : (
-                        <Volume2 className="h-3 w-3" />
-                      )}
-                    </button>
-                  </div>
+                  </span>
                 </div>
               </div>
-            );
-          })}
+            )}
+
+            {visibleRemotePeers.map(
+              ({ peerId, stream, participant, hasVideo, hasAudio }) => {
+                const isPeerMuted = deafened || Boolean(mutedPeers[peerId]);
+                return (
+                  <div
+                    key={peerId}
+                    className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-950 dark:border-slate-700"
+                  >
+                    {hasVideo ? (
+                      <div className="aspect-video w-full">
+                        <MediaStreamView
+                          stream={stream}
+                          hasVideo
+                          muted={isPeerMuted}
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex aspect-video w-full flex-col items-center justify-center gap-1 bg-slate-900 text-slate-200">
+                        <MediaStreamView
+                          stream={stream}
+                          hasVideo={false}
+                          muted={isPeerMuted}
+                        />
+                        <span className="text-xl sm:text-2xl" aria-hidden="true">
+                          {participant.avatar}
+                        </span>
+                        <span className="text-[10px] font-medium text-slate-300">
+                          {hasAudio ? 'Voice active' : 'Audio muted'}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between gap-1 bg-slate-950/90 px-2 py-1 text-[10px] text-white">
+                      <span className="truncate font-semibold">
+                        {participant.displayName}
+                      </span>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {hasAudio ? (
+                          <Mic className="h-3 w-3 text-emerald-400" />
+                        ) : (
+                          <MicOff className="h-3 w-3 text-slate-400" />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMutedPeers((prev) => ({
+                              ...prev,
+                              [peerId]: !prev[peerId],
+                            }))
+                          }
+                          className="rounded p-0.5 text-slate-300 hover:bg-white/10 hover:text-white"
+                          title={isPeerMuted ? 'Unmute peer' : 'Mute peer'}
+                          aria-label={
+                            isPeerMuted
+                              ? `Unmute ${participant.displayName}`
+                              : `Mute ${participant.displayName}`
+                          }
+                        >
+                          {isPeerMuted ? (
+                            <VolumeX className="h-3 w-3 text-amber-400" />
+                          ) : (
+                            <Volume2 className="h-3 w-3" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              },
+            )}
+          </div>
         </div>
       )}
     </section>

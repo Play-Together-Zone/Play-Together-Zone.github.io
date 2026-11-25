@@ -505,11 +505,11 @@ function RoomWorkspace() {
   );
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pb-24 sm:pb-20">
       {toast && (
         <div
           role="status"
-          className="animate-pop fixed right-4 bottom-4 z-50 rounded-xl border border-amber-500/40 bg-slate-900 px-4 py-3 text-sm font-medium text-amber-300 shadow-xl"
+          className="animate-pop fixed top-20 right-3 z-50 rounded-xl border border-amber-500/40 bg-slate-900 px-4 py-3 text-sm font-medium text-amber-300 shadow-xl sm:right-4"
         >
           {toast}
         </div>
@@ -1022,19 +1022,8 @@ function RoomWorkspace() {
           )}
         </div>
 
-        {/* Right Sidebar: Voice/Video, Seats, Spectators & Chat */}
+        {/* Right Sidebar: Seats, Spectators & Chat */}
         <div className="space-y-4">
-          <VoiceVideoPanel
-            key={activeAdapter?.selfPeerId ?? 'offline'}
-            adapter={activeAdapter}
-            connected={connStatus === 'connected'}
-            snapshot={snapshot}
-            selfPlayerId={profile.playerId}
-            selfDisplayName={profile.displayName}
-            selfAvatar={profile.avatar}
-            blockedPlayerIds={blockedIds}
-          />
-
           <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <h2 className="flex items-center justify-between text-xs font-bold tracking-wide text-slate-600 uppercase dark:text-slate-300">
               <span className="flex items-center gap-1.5">
@@ -1134,6 +1123,18 @@ function RoomWorkspace() {
           />
         </div>
       </div>
+
+      {/* Floating Voice & Video Dock (Desktop + Mobile responsive) */}
+      <VoiceVideoPanel
+        key={activeAdapter?.selfPeerId ?? 'offline'}
+        adapter={activeAdapter}
+        connected={connStatus === 'connected'}
+        snapshot={snapshot}
+        selfPlayerId={profile.playerId}
+        selfDisplayName={profile.displayName}
+        selfAvatar={profile.avatar}
+        blockedPlayerIds={blockedIds}
+      />
 
       {showQrModal && (
         <div
