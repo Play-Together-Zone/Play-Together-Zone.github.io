@@ -747,7 +747,7 @@ export function VoiceVideoPanel({
       ref={panelRef}
       aria-label="Floating voice and video chat"
       style={panelStyle}
-      className={`fixed right-2 bottom-2 z-40 flex max-h-[56dvh] max-w-[calc(100vw-1rem)] flex-col rounded-2xl border border-slate-200/90 bg-white/95 shadow-2xl backdrop-blur-md transition-shadow sm:right-4 sm:bottom-4 sm:max-h-[calc(100dvh-2rem)] dark:border-slate-700/90 dark:bg-slate-900/95 ${
+      className={`fixed right-2 bottom-2 z-40 flex max-h-[56dvh] max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 shadow-2xl backdrop-blur-md transition-shadow sm:right-4 sm:bottom-4 sm:max-h-[calc(100dvh-2rem)] dark:border-slate-700/90 dark:bg-slate-900/95 ${
         activeExpanded
           ? panelSize
             ? ''
@@ -866,10 +866,10 @@ export function VoiceVideoPanel({
         onPointerUp={handleDragPointerEnd}
         onPointerCancel={handleDragPointerEnd}
         onDoubleClick={() => setDragPos(null)}
-        className="flex cursor-grab touch-none flex-wrap items-center justify-between gap-1 px-2.5 py-2 active:cursor-grabbing sm:gap-1.5"
+        className="flex cursor-grab touch-none flex-nowrap items-center justify-between gap-1.5 px-2.5 py-2 active:cursor-grabbing"
         title={dragPos ? 'Drag to move · Double-click to reset dock' : 'Drag to move'}
       >
-        <div className="flex min-w-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           <GripHorizontal className="h-3.5 w-3.5 shrink-0 text-slate-400" />
           <Headphones className="hidden h-3.5 w-3.5 shrink-0 text-indigo-500 sm:inline" />
           {!isCompactWidth && (
@@ -884,12 +884,21 @@ export function VoiceVideoPanel({
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div
+          onPointerDown={(e) => e.stopPropagation()}
+          onWheel={(e) => {
+            if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
+              e.currentTarget.scrollLeft += e.deltaY;
+            }
+          }}
+          className="min-w-0 flex-1 touch-pan-x overflow-x-auto pb-0.5 [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400/50"
+        >
+          <div className="flex w-max min-w-full items-center justify-end gap-1">
           <button
             type="button"
             disabled={!supportsWebRtcMedia || !connected || busy}
             onClick={() => void handleToggleMic()}
-            className={`inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[11px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 sm:px-2 ${
+            className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-1.5 py-1 text-[11px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 sm:px-2 ${
               audioEnabled
                 ? 'bg-emerald-600 text-white hover:bg-emerald-500'
                 : 'border border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
@@ -907,7 +916,7 @@ export function VoiceVideoPanel({
             type="button"
             disabled={!supportsWebRtcMedia || !connected || busy}
             onClick={() => void handleToggleVideo()}
-            className={`inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[11px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 sm:px-2 ${
+            className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-1.5 py-1 text-[11px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 sm:px-2 ${
               videoEnabled
                 ? 'bg-indigo-600 text-white hover:bg-indigo-500'
                 : 'border border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
@@ -924,7 +933,7 @@ export function VoiceVideoPanel({
           <button
             type="button"
             onClick={() => setDeafened((d) => !d)}
-            className={`rounded-lg p-1.5 transition ${
+            className={`shrink-0 rounded-lg p-1.5 transition ${
               deafened
                 ? 'bg-amber-500/20 text-amber-600 dark:text-amber-300'
                 : 'border border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
@@ -939,7 +948,7 @@ export function VoiceVideoPanel({
             <button
               type="button"
               onClick={stopAllLocalMedia}
-              className="rounded-lg bg-rose-600 p-1.5 text-white transition hover:bg-rose-500"
+              className="shrink-0 rounded-lg bg-rose-600 p-1.5 text-white transition hover:bg-rose-500"
               title="Turn off mic & camera"
               aria-label="Leave voice and video call"
             >
@@ -951,7 +960,7 @@ export function VoiceVideoPanel({
             <button
               type="button"
               onClick={() => setSingleView((s) => !s)}
-              className={`rounded-lg p-1.5 transition ${
+              className={`shrink-0 rounded-lg p-1.5 transition ${
                 singleView
                   ? 'bg-sky-600 text-white hover:bg-sky-500'
                   : 'border border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
@@ -979,7 +988,7 @@ export function VoiceVideoPanel({
             <button
               type="button"
               onClick={handleToggleSizePreset}
-              className="rounded-lg border border-slate-300 p-1.5 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="shrink-0 rounded-lg border border-slate-300 p-1.5 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               title={panelSize ? 'Reset dock size' : 'Expand dock size'}
               aria-label={panelSize ? 'Reset voice and video dock size' : 'Expand voice and video dock size'}
             >
@@ -995,7 +1004,7 @@ export function VoiceVideoPanel({
             <button
               type="button"
               onClick={() => setMinimized((m) => !m)}
-              className="rounded-lg border border-slate-300 p-1.5 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="shrink-0 rounded-lg border border-slate-300 p-1.5 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               title={minimized ? 'Show video & voice tiles' : 'Minimize to floating bar'}
               aria-label={minimized ? 'Expand voice and video panel' : 'Minimize voice and video panel'}
             >
@@ -1006,6 +1015,7 @@ export function VoiceVideoPanel({
               )}
             </button>
           )}
+          </div>
         </div>
       </div>
 
